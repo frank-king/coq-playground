@@ -1,0 +1,6 @@
+.*.sw*
+*.glob
+*.vo*
+.*.aux
+Makefile.coq*
+.Makefile*
