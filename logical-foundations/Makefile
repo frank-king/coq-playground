@@ -4,7 +4,7 @@ ALLVFILES := \
 	Preface.v                 PrefaceTest.v \
 	Basics.v                  BasicsTest.v \
 	Induction.v               InductionTest.v \
-	# Lists.v                   ListsTest.v \
+	Lists.v                   ListsTest.v \
 	# Poly.v                    PolyTest.v \
 	# Tactics.v                 TacticsTest.v \
 	# Logic.v                   LogicTest.v \
