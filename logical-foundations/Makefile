@@ -7,7 +7,7 @@ ALLVFILES := \
 	Lists.v                   ListsTest.v \
 	Poly.v                    PolyTest.v \
 	Tactics.v                 TacticsTest.v \
-	# Logic.v                   LogicTest.v \
+	Logic.v                   LogicTest.v \
 	# IndProp.v                 IndPropTest.v \
 	# Maps.v                    MapsTest.v \
 	# ProofObjects.v            ProofObjectsTest.v \
