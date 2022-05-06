@@ -2535,206 +2535,22 @@ Proof.
     + apply IH. apply H.
 Qed.
 
-(*
-Lemma filter_all_longest_length  (X : Type) :
-  forall n (l : list X), length l = n ->
-  (forall (test : X -> bool),
-  filter_all_true test l <-> length (filter test l) = n).
-Proof.
-  intros n. induction n as [|n IH].
-  - split.
-    + intros H1. apply  destruct l as [|h l]. { reflexivity. } { discriminate H. }
-    + intros H1. destruct l as [|h l]. { apply f_nil. } { discriminate H. }
-  - split.
-    + intros H1.
-      destruct l as [|h l]. { discriminate H. }
-      {
-        apply
-        injection H as H.
-        destruct (test h) eqn:Htest.
-        { 
-          simpl.
-          rewrite Htest.
-          simpl.
-          apply f_equal.
-      }
-    intros H1.
-    + intros H1. d
-    intros [|h l] H0 test H. { reflexivity. } { discriminate H0. }
-    + discriminate H0.
-    + simpl in H0.
-      injection H0 as H0.
-
-  - intros test' H. reflexivity.
-  - intros test' H.
-Qed.
- *)
-
-Lemma filter_all_longest_induction (X : Type) (l : list X) (test0 : X -> bool):
-  (forall (test : X -> bool), length (filter test l) <= length (filter test0 l)) ->
-  length (filter test0 l) = length l.
-Proof.
-  induction l as [|h l IH].
-  - intros H. reflexivity.
-  - intros H. 
-    assert (Htest0: test0 h = true).
-    {
-      destruct (test0 h) eqn:Htest0.  { reflexivity. }
-      apply dist_not_exists in H.
-      exfalso.
-      apply H.
-      remember (fun _: X => true) as test.
-      exists test.
-      apply Gt.gt_not_le.
-      simpl.
-      rewrite Htest0.
-      simpl.
-      assert (Hl: filter_all_true test l).
-      { 
-        apply filter_all_true_instance.
-        rewrite Heqtest.
-        reflexivity.
-      } 
-      apply filter_all_true_correct in Hl.
-      rewrite Hl.
-      rewrite Heqtest.
-      simpl.
-      unfold gt.
-      unfold lt.
-      apply n_le_m__Sn_le_Sm.
-      apply filter_length.
-    }
-    simpl.
-    rewrite Htest0.
-    simpl.
-    apply f_equal.
-    apply IH.
-    assert (H': ~ (exists test, length (filter test l) > length (filter test0 l))).
-    {
-      intros [test H'].
-      apply dist_not_exists in H.
-      apply H.
-      exists test.
-      apply Gt.gt_not_le.
-      simpl.
-      rewrite Htest0.
-      destruct (test h) eqn:Htest.
-      {
-        simpl.
-        apply n_le_m__Sn_le_Sm.
-        unfold gt in H'.
-        unfold lt in H'.
-        apply H'.
-      }
-      {
-        simpl.
-        admit.
-      }
-    }
-
-    (* apply not_exists_dist. *)
-
-    simpl.
-    remember (length l) as n eqn:Hl.
-    symmetry in Hl.
-    assert (H'': forall test, length (filter test l) <=
-    length (filter test (h :: l)) <= S (length (filter test l))).
-    {
-      admit.
-    }
-Admitted.
-
 Theorem filter_all_longest (X : Type) :
   forall (l : list X) (test0 : X -> bool),
-  filter_all_true test0 l <-> 
+  filter_all_true test0 l -> 
   forall (test : X -> bool), length (filter test l) <= length (filter test0 l).
 Proof.
-  split.
-  - intros H. induction H as [|h l H0 H IH].
-    + intros test. apply le_n.
-    + intros test.
-      apply filter_all_true_correct in H.
-      assert (H1: length (filter test (h :: l)) <= length (h :: l)).
-      { apply filter_length. }
-      simpl.
-      rewrite H.
-      rewrite H0.
-      apply H1.
-  - induction l as [|h l IH].
-    + intros test. apply f_nil.
-    + intros H0. 
-      remember (fun _ : X => true) as Hf.
-      assert (H: filter_all_true Hf l).
-      { apply filter_all_true_instance. rewrite HeqHf. reflexivity. }
-      assert (H1: test0 h = true).
-      {
-        apply dist_not_exists in H0.
-        destruct (test0 h) eqn:Htest.
-        { reflexivity. }
-        {
-          simpl in H0. 
-          exfalso.
-          apply H0.
-          exists Hf.
-          assert (Hfh: Hf h = true). { rewrite HeqHf. reflexivity. } 
-          rewrite Hfh.
-          rewrite Htest.
-          intros contra.
-          apply filter_all_true_correct in H.
-          rewrite H in contra.
-          simpl in contra.
-          assert (H1: length (filter test0 l) < S (length l)).
-          { unfold lt. apply n_le_m__Sn_le_Sm. apply filter_length. }
-          apply Gt.gt_not_le in H1.
-          contradiction.
-        }
-      }
-      apply f_cons. { apply H1. }
-      { 
-        apply IH.
-        intros test'.
-        assert (H2: length (filter test' (h :: l)) <= length (filter test0 (h :: l))).
-        { apply H0. }
-        destruct (test' h) eqn:Htest'.
-        {
-          simpl in H2.
-          rewrite Htest' in H2.
-          rewrite H1 in H2.
-          simpl in H2.
-          apply Sn_le_Sm__n_le_m in H2.
-          apply H2.
-        }
-        (*
-        {
-          simpl in H2.
-          rewrite Htest' in H2.
-          rewrite H1 in H2.
-          simpl in H2.
-          (* apply Sn_le_Sm__n_le_m in H2. *)
-          apply H2.
-
-          assert (H2: length (filter test' (h :: l)) <= length (filter test0 (h :: l))).
-          { apply H0. }
-          simpl in H2.
-          rewrite H1 in H2.
-          rewrite Htest' in H2.
-          simpl in H2.
-          apply Sn_le_Sm__n_le_m.
-          apply H2.
-        }
-        {
-          assert (H2: length (filter test' (h :: l)) <= length (filter test0 (h :: l))).
-          { apply H0. }
-          (* apply dist_not_exists in H0. *)
-          simpl in H2.
-          rewrite H1 in H2.
-          rewrite Htest' in H2.
-          simpl in H2.
-          admit. (* It might need the [excluded_middle] rule. *)
-        }
-         *)
-        admit.
-Admitted.
+  intros l test0 H. induction H as [|h l H0 H IH].
+  - intros test. apply le_n.
+  - intros test.
+    apply filter_all_true_correct in H.
+    assert (H1: length (filter test (h :: l)) <= length (h :: l)).
+    { apply filter_length. }
+    simpl.
+    rewrite H.
+    rewrite H0.
+    apply H1.
+Qed.
 (* [] *)
 
 (** **** Exercise: 4 stars, standard, optional (palindromes)
