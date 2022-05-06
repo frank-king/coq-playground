@@ -9,7 +9,7 @@ ALLVFILES := \
 	Tactics.v                 TacticsTest.v \
 	Logic.v                   LogicTest.v \
 	IndProp.v                 IndPropTest.v \
-	# Maps.v                    MapsTest.v \
+	Maps.v                    MapsTest.v \
 	# ProofObjects.v            ProofObjectsTest.v \
 	# IndPrinciples.v           IndPrinciplesTest.v \
 	# Rel.v                     RelTest.v \
