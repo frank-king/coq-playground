@@ -12,7 +12,7 @@ ALLVFILES := \
 	Maps.v                    MapsTest.v \
 	ProofObjects.v            ProofObjectsTest.v \
 	IndPrinciples.v           IndPrinciplesTest.v \
-	# Rel.v                     RelTest.v \
+	Rel.v                     RelTest.v \
 	# Imp.v                     ImpTest.v \
 	# ImpParser.v               ImpParserTest.v \
 	# ImpCEvalFun.v             ImpCEvalFunTest.v \
