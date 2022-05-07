@@ -72,7 +72,10 @@ Proof.
 Theorem plus_one_r' : forall n:nat,
   n + 1 = S n.
 Proof.
-  (* FILL IN HERE *) Admitted.
+  apply nat_ind.
+  - reflexivity.
+  - intros n IH. simpl. apply f_equal. apply IH.
+Qed.
 (** [] *)
 
 (** Coq generates induction principles for every datatype
@@ -181,8 +184,14 @@ Inductive booltree : Type :=
   | bt_leaf (b : bool)
   | bt_branch (b : bool) (t1 t2 : booltree).
 
-(* FILL IN HERE:
-   ... *)
+Check booltree_ind :
+  forall P : booltree -> Prop,
+  P bt_empty ->
+  (forall b : bool, P (bt_leaf b)) ->
+  (forall (b : bool) (t1 : booltree), P t1 -> forall (t2 : booltree), P t2 -> P (bt_branch b t1 t2)) ->
+  forall t : booltree, P t.
+
+(* ... *)
 
 (* Do not modify the following line: *)
 Definition manual_grade_for_booltree_ind : option (nat*string) := None.
@@ -201,7 +210,15 @@ Definition manual_grade_for_booltree_ind : option (nat*string) := None.
     principle Coq generates is that given above: *)
 
 Inductive Toy : Type :=
-  (* FILL IN HERE *)
+  | con1 (b : bool) : Toy
+  | con2 (n : nat) (t : Toy) : Toy
+.
+
+Check Toy_ind :
+  forall P : Toy -> Prop,
+    (forall b : bool, P (con1 b)) ->
+    (forall (n : nat) (t : Toy), P t -> P (con2 n t)) ->
+    forall t : Toy, P t
 .
 (* Do not modify the following line: *)
 Definition manual_grade_for_toy_ind : option (nat*string) := None.
@@ -247,7 +264,12 @@ Definition manual_grade_for_toy_ind : option (nat*string) := None.
 Inductive tree (X:Type) : Type :=
   | leaf (x : X)
   | node (t1 t2 : tree X).
-Check tree_ind.
+Check tree_ind : 
+  forall (X : Type) (P : tree X -> Prop),
+  (forall x : X, P (leaf X x)) ->
+   (forall t1 : tree X, P t1 -> forall t2 : tree X, P t2 -> P (node X t1 t2)) ->
+   forall t : tree X, P t
+.
 (** [] *)
 
 (** **** Exercise: 1 star, standard, optional (mytype)
@@ -263,6 +285,19 @@ Check tree_ind.
                forall n : nat, P (constr3 X m n)) ->
             forall m : mytype X, P m
 *) 
+Inductive mytype (X : Type) : Type :=
+  | constr1 (x : X)
+  | constr2 (n : nat)
+  | constr3 (m : mytype X) (n : nat)
+.
+Check mytype_ind : 
+        forall (X : Type) (P : mytype X -> Prop),
+            (forall x : X, P (constr1 X x)) ->
+            (forall n : nat, P (constr2 X n)) ->
+            (forall m : mytype X, P m ->
+               forall n : nat, P (constr3 X m n)) ->
+            forall m : mytype X, P m
+.
 (** [] *)
 
 (** **** Exercise: 1 star, standard, optional (foo)
@@ -278,6 +313,20 @@ Check tree_ind.
                (forall n : nat, P (f1 n)) -> P (quux X Y f1)) ->
              forall f2 : foo X Y, P f2
 *) 
+Inductive foo (X Y : Type) : Type :=
+  | bar (x : X)
+  | baz (y : Y)
+  | quux (f1 : nat -> foo X Y) 
+.
+
+Check foo_ind :
+        forall (X Y : Type) (P : foo X Y -> Prop),
+             (forall x : X, P (bar X Y x)) ->
+             (forall y : Y, P (baz X Y y)) ->
+             (forall f1 : nat -> foo X Y,
+               (forall n : nat, P (f1 n)) -> P (quux X Y f1)) ->
+             forall f2 : foo X Y, P f2
+.
 (** [] *)
 
 (** **** Exercise: 1 star, standard, optional (foo')
@@ -287,6 +336,14 @@ Check tree_ind.
 Inductive foo' (X:Type) : Type :=
   | C1 (l : list X) (f : foo' X)
   | C2.
+
+Check foo'_ind :
+        forall (X : Type) (P : foo' X -> Prop),
+              (forall (l : list X) (f : foo' X),
+                    P f -> P (C1 X l f)) ->
+             P (C2 X) ->
+             forall f : foo' X, P f
+             .
 
 (** What induction principle will Coq generate for [foo']?  (Fill
    in the blanks, then check your answer with Coq.)
@@ -436,9 +493,29 @@ Proof.
     induction, and state the theorem and proof in terms of this
     defined proposition.  *)
 
-(* FILL IN HERE
+Theorem add_assoc'' : forall n m p : nat,
+  n + (m + p) = (n + m) + p.
+Proof.
+  intros n m.
+  apply nat_ind.
+  - rewrite add_0_r. rewrite add_0_r. reflexivity.
+  - intros p IH.
+    rewrite <- plus_n_Sm.
+    rewrite <- plus_n_Sm.
+    rewrite <- plus_n_Sm.
+    apply f_equal.
+    apply IH.
+Qed.
 
-    [] *)
+Theorem add_comm''' : forall n m : nat,
+  n + m = m + n.
+Proof.
+  intros n.
+  apply nat_ind.
+  - rewrite add_0_r.  reflexivity.
+  - intros m IH. rewrite <- plus_n_Sm. simpl. apply f_equal. apply IH.
+Qed.
+(* [] *)
 
 (* ################################################################# *)
 (** * Induction Principles for Propositions *)
