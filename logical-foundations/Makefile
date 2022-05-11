@@ -14,8 +14,8 @@ ALLVFILES := \
 	IndPrinciples.v           IndPrinciplesTest.v \
 	Rel.v                     RelTest.v \
 	Imp.v                     ImpTest.v \
-	# ImpParser.v               ImpParserTest.v \
-	# ImpCEvalFun.v             ImpCEvalFunTest.v \
+	ImpParser.v               ImpParserTest.v \
+	ImpCEvalFun.v             ImpCEvalFunTest.v \
 	# Extraction.v              ExtractionTest.v \
 	# Auto.v                    AutoTest.v \
 	# AltAuto.v                 AltAutoTest.v \

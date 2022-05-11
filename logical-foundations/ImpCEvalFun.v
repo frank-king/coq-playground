@@ -207,16 +207,18 @@ Proof. reflexivity. Qed.
    [X] (inclusive: [1 + 2 + ... + X]) in the variable [Y].  Make sure
    your solution satisfies the test that follows. *)
 
-Definition pup_to_n : com
-  (* REPLACE THIS LINE WITH ":= _your_definition_ ." *). Admitted.
+Definition pup_to_n : com := <{
+  Y := 0;
+  while ~(X = 0) do
+    Y := Y + X;
+    X := X - 1
+  end
+}>.
 
 Example pup_to_n_1 :
   test_ceval (X !-> 5) pup_to_n
   = Some (0, 15, 0).
-(* FILL IN HERE *) Admitted.
-(* 
 Proof. reflexivity. Qed.
-*)
 (** [] *)
 
 (** **** Exercise: 2 stars, standard, optional (peven)
@@ -225,9 +227,19 @@ Proof. reflexivity. Qed.
     sets [Z] to [1] otherwise.  Use [test_ceval] to test your
     program. *)
 
-(* FILL IN HERE
+Definition even_odd_x : com := <{
+  Z := 0;
+  while ~(X = 0) do
+    Z := 1 - Z;
+    X := X - 1
+  end
+}>.
 
-    [] *)
+Example even_odd_x_5 :
+  test_ceval (X !-> 5) even_odd_x
+  = Some (0, 0, 1).
+Proof. reflexivity. Qed.
+(* [] *)
 
 (* ################################################################# *)
 (** * Relational vs. Step-Indexed Evaluation *)
@@ -359,8 +371,21 @@ Theorem ceval__ceval_step: forall c st st',
       exists i, ceval_step st c i = Some st'.
 Proof.
   intros c st st' Hce.
-  induction Hce.
-  (* FILL IN HERE *) Admitted.
+  induction Hce; try (exists 1; simpl; try rewrite H; reflexivity); try (
+    destruct IHHce1 as [i1 IHHce1];
+    destruct IHHce2 as [i2 IHHce2];
+    exists (i1 + i2);
+    destruct i1; destruct i2; subst; try discriminate;
+    simpl;
+    try rewrite H;
+    apply ceval_step_more with (i2 := i1 + S i2) in IHHce1;
+    apply ceval_step_more with (i2 := i1 + S i2) in IHHce2;
+    try rewrite IHHce1; try apply IHHce2;
+    lia
+  ); try (
+    destruct IHHce as [i IHHce]; exists (S i); simpl; rewrite H; assumption
+  ).
+Qed.
 (** [] *)
 
 Theorem ceval_and_ceval_step_coincide: forall c st st',
