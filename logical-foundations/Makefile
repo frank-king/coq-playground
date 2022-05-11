@@ -13,7 +13,7 @@ ALLVFILES := \
 	ProofObjects.v            ProofObjectsTest.v \
 	IndPrinciples.v           IndPrinciplesTest.v \
 	Rel.v                     RelTest.v \
-	# Imp.v                     ImpTest.v \
+	Imp.v                     ImpTest.v \
 	# ImpParser.v               ImpParserTest.v \
 	# ImpCEvalFun.v             ImpCEvalFunTest.v \
 	# Extraction.v              ExtractionTest.v \
