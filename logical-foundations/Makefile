@@ -16,11 +16,11 @@ ALLVFILES := \
 	Imp.v                     ImpTest.v \
 	ImpParser.v               ImpParserTest.v \
 	ImpCEvalFun.v             ImpCEvalFunTest.v \
-	# Extraction.v              ExtractionTest.v \
-	# Auto.v                    AutoTest.v \
-	# AltAuto.v                 AltAutoTest.v \
-	# Postscript.v              PostscriptTest.v \
-	# Bib.v                     BibTest.v \
+	Extraction.v              ExtractionTest.v \
+	Auto.v                    AutoTest.v \
+	AltAuto.v                 AltAutoTest.v \
+	Postscript.v              PostscriptTest.v \
+	Bib.v                     BibTest.v \
 
 
 build: Makefile.coq

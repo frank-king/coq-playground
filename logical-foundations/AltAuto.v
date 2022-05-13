@@ -441,7 +441,23 @@ Qed.
 Lemma re_opt_match' : forall T (re: reg_exp T) s,
   s =~ re -> s =~ re_opt re.
 Proof.
-(* FILL IN HERE *) Admitted.
+  intros T re s M.
+  induction M
+    as [| x'
+        | s1 re1 s2 re2 Hmatch1 IH1 Hmatch2 IH2
+        | s1 re1 re2 Hmatch IH | re1 s2 re2 Hmatch IH
+        | re | s1 s2 re Hmatch1 IH1 Hmatch2 IH2];
+  simpl; try constructor.
+  - destruct re1; try (inversion IH1; simpl; destruct re2; assumption);
+    destruct re2; try (inversion IH2; rewrite app_nil_r; assumption);
+    try (apply MApp; assumption).
+  - destruct re1; destruct re2; try (try apply MUnionL; assumption); inversion IH.
+  - destruct re1; destruct re2; try (try apply MUnionR; assumption); inversion IH.
+  - destruct re; try (constructor; simpl; destruct re; constructor).
+  - destruct re; try (inversion IH1; inversion IH2; apply MEmpty);
+    try (apply star_app; try assumption; apply MStar1; assumption).
+Qed.
+
 (* Do not modify the following line: *)
 Definition manual_grade_for_re_opt : option (nat*string) := None.
 (** [] *)
@@ -740,7 +756,43 @@ Lemma weak_pumping : forall T (re : reg_exp T) s,
     s2 <> [] /\
     forall m, s1 ++ napp m s2 ++ s3 =~ re.
 Proof.
-(* FILL IN HERE *) Admitted.
+  intros T re s Hmatch.
+  induction Hmatch
+    as [ | x | s1 re1 s2 re2 Hmatch1 IH1 Hmatch2 IH2
+       | s1 re1 re2 Hmatch IH | re1 s2 re2 Hmatch IH
+       | re | s1 s2 re Hmatch1 IH1 Hmatch2 IH2 ]; simpl; try lia.
+  - (* MApp *)
+    rewrite app_length. intros H.
+    apply add_le_cases in H.
+    destruct H as [H|H].
+    + apply IH1 in H.
+      destruct H as [s11 [s12 [s13 [H' [H2 H3]]]]].
+      exists s11. exists s12. exists (s13 ++ s2). split; try split; auto.
+      * rewrite H'. repeat try rewrite app_assoc. reflexivity.
+      * intros m. rewrite app_assoc. rewrite app_assoc. 
+        apply MApp; try rewrite <- app_assoc; auto.
+    + apply IH2 in H.
+      destruct H as [s21 [s22 [s23 [H' [H2 H3]]]]].
+      exists (s1 ++ s21). exists s22. exists s23. split; try split; auto.
+      * rewrite H'. repeat try rewrite app_assoc. reflexivity.
+      * intros m. rewrite <- app_assoc. apply MApp; auto.
+  - intros H. apply plus_le in H. destruct H as [H1 H2].
+    apply IH in H1.
+    destruct H1 as [s11 [s12 [s13 [H1' [H3 H4]]]]].
+    exists s11. exists s12. exists s13. split; try split; auto.
+    intros m. apply MUnionL. auto.
+  - simpl. intros H. apply plus_le in H. destruct H as [H1 H2].
+    apply IH in H2.
+    destruct H2 as [s11 [s12 [s13 [H2' [H3 H4]]]]].
+    exists s11. exists s12. exists s13. split; try split; auto.
+    intros m. apply MUnionR. auto.
+  - intros Hc. inversion Hc. apply pumping_constant_0_false in H0. destruct H0.
+  - intros H. destruct s1 as [|h s1].
+    + apply IH2 in H. apply H.
+    + exists []. exists (h :: s1). exists s2. split; try split; auto.
+      * discriminate.
+      * intros m. apply napp_star; assumption.
+Qed.
 (* Do not modify the following line: *)
 Definition manual_grade_for_pumping_redux : option (nat*string) := None.
 (** [] *)
@@ -760,7 +812,75 @@ Lemma pumping : forall T (re : reg_exp T) s,
     length s1 + length s2 <= pumping_constant re /\
     forall m, s1 ++ napp m s2 ++ s3 =~ re.
 Proof.
-(* FILL IN HERE *) Admitted.
+  intros T re s Hmatch.
+  induction Hmatch
+    as [ | x | s1 re1 s2 re2 Hmatch1 IH1 Hmatch2 IH2
+       | s1 re1 re2 Hmatch IH | re1 s2 re2 Hmatch IH
+       | re | s1 s2 re Hmatch1 IH1 Hmatch2 IH2 ]; simpl; try lia.
+  - (* MApp *)
+    rewrite app_length. intros H.
+    apply add_le_cases in H.
+    destruct H as [H|H].
+    + (* [H: pumping_constant re1 <= length s1]. *)
+      apply IH1 in H.
+      destruct H as [s11 [s12 [s13 [H' [H2 [H3 H4]]]]]].
+      exists s11. exists s12. exists (s13 ++ s2).
+      split; repeat try split; try lia; auto.
+      * rewrite H'. repeat try rewrite app_assoc. auto.
+      * intros m. repeat try rewrite app_assoc.
+        apply MApp; try rewrite <- app_assoc; auto.
+    + (* [H: pumping_constant re2 <= length s2]. *)
+      apply IH2 in H.
+      destruct H as [s21 [s22 [s23 [Hb [H2 [H3 H4]]]]]].
+      destruct (lt_ge_cases (length s1) (pumping_constant re1)) as [H|H].
+      * (* [H: length s1 < pumping_constant re1]. *)
+        apply n_lt_m__n_le_m in H.
+        exists (s1 ++ s21). exists s22. exists s23. split; repeat try split; auto.
+        { rewrite Hb. rewrite <- app_assoc. reflexivity. }
+        { rewrite app_length. lia. }
+        { intros m'. rewrite <- app_assoc. apply MApp; auto. }
+      * (* [H: length s1 >= pumping_constant re1]. Use [IH1] to pump [s1]. *)
+        apply IH1 in H.
+        destruct H as [s11 [s12 [s13 [Ha [H5 [H6 H7]]]]]].
+        exists s11. exists s12. exists (s13 ++ s2). 
+        split; repeat try split; try lia; auto.
+        { rewrite Ha. repeat try rewrite <- app_assoc. reflexivity. }
+        {
+          intros m'. try repeat rewrite app_assoc.
+          apply MApp; try rewrite <- app_assoc; auto. 
+        }
+  - (* MUnionL *)
+    intros H. apply plus_le in H. destruct H as [H1 H2].
+    apply IH in H1.
+    destruct H1 as [s11 [s12 [s13 [H1' [H3 [H4 H5]]]]]].
+    exists s11. exists s12. exists s13. split; repeat try split; try lia; auto.
+    * intros m. apply MUnionL. auto. 
+  - (* MUnionR *)
+    intros H. apply plus_le in H. destruct H as [H1 H2].
+    apply IH in H2.
+    destruct H2 as [s11 [s12 [s13 [H2' [H3 [H4 H5]]]]]].
+    exists s11. exists s12. exists s13. split; repeat try split; try lia; auto.
+    * intros m. apply MUnionR. auto. 
+  - (* MStar0 *)
+    intros Hc. inversion Hc. apply pumping_constant_0_false in H0. destruct H0.
+  - (* MStarApp *)
+    intros H0. simpl in H0. simpl in IH2.
+    rewrite app_length in H0.
+    destruct (lt_ge_cases (length s1) (pumping_constant re)) as [H|H].
+    + (* [H: length s1 < pumping_constant re]. *)
+      apply n_lt_m__n_le_m in H.
+      destruct s1 as [|h s1]; try auto.
+      * exists []. exists (h :: s1). exists s2.
+        split; repeat try split; try discriminate; auto.
+        intros m. apply napp_star; auto.
+    + (* [H: length s1 >= pumping_constant re]. Use [IH1] to pump [s1]. *)
+      apply IH1 in H.
+      destruct H as [s11 [s12 [s13 [H' [H2 [H3 H4]]]]]].
+      exists s11. exists s12. exists (s13 ++ s2). split; repeat try split; auto.
+      * rewrite H'. repeat try rewrite <- app_assoc. auto.
+      * intros m. repeat try rewrite app_assoc.
+        apply MStarApp; try rewrite <- app_assoc; auto.
+Qed.
 (* Do not modify the following line: *)
 Definition manual_grade_for_pumping_redux_strong : option (nat*string) := None.
 (** [] *)
