@@ -1,9 +1,9 @@
 COQMFFLAGS := -Q . PLF  
 
 ALLVFILES := \
-	# Maps.v                        MapsTest.v \
-	# Imp.v                         ImpTest.v \
-	# Preface.v                     PrefaceTest.v \
+	Maps.v                        MapsTest.v \
+	Imp.v                         ImpTest.v \
+	Preface.v                     PrefaceTest.v \
 	# Equiv.v                       EquivTest.v \
 	# Hoare.v                       HoareTest.v \
 	# Hoare2.v                      Hoare2Test.v \
