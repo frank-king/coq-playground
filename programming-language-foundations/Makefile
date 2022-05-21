@@ -6,7 +6,7 @@ ALLVFILES := \
 	Preface.v                     PrefaceTest.v \
 	Equiv.v                       EquivTest.v \
 	Hoare.v                       HoareTest.v \
-	# Hoare2.v                      Hoare2Test.v \
+	Hoare2.v                      Hoare2Test.v \
 	# HoareAsLogic.v                HoareAsLogicTest.v \
 	# Smallstep.v                   SmallstepTest.v \
 	# Types.v                       TypesTest.v \

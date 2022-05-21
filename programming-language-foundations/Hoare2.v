@@ -261,15 +261,15 @@ These decorations were constructed as follows:
 
        {{ True }}
       if X <= Y then
-          {{                         }} ->>
-          {{                         }}
+          {{ True /\ X <= Y          }} ->>
+          {{ Y = X + Y - X           }}
         Z := Y - X
-          {{                         }}
+          {{ Y = X + Z               }}
       else
-          {{                         }} ->>
-          {{                         }}
+          {{ True /\ ~ (X <= Y)      }} ->>
+          {{ X + Z = X + Z           }}
         Y := X + Z
-          {{                         }}
+          {{ Y = X + Z               }}
       end
         {{ Y = X + Z }}
 
@@ -677,7 +677,23 @@ Qed.
     Write an informal decorated program showing that this procedure
     is correct, and justify each use of [->>]. *)
 
-(* FILL IN HERE *)
+(**
+
+        {{ X = m }} ->>
+        {{ 0 + X = m }}
+      Y := 0;
+        {{ Y + X = m }}
+      while ~(X = 0) do
+          {{ Y + X = m /\ X <> 0 }} ->>
+          {{ (Y + 1) + (X - 1) = m }}
+        X := X - 1;
+          {{ (Y + 1) + X = m }}
+        Y := Y + 1
+          {{ Y + X = m }}
+      end
+        {{ Y + X = m /\ X = 0 }} ->>
+        {{ Y = m }}
+ *)
 
 (* Do not modify the following line: *)
 Definition manual_grade_for_decorations_in_slow_assignment : option (nat*string) := None.
@@ -701,9 +717,22 @@ Definition manual_grade_for_decorations_in_slow_assignment : option (nat*string)
     specification of [add_slowly]; then (informally) decorate the
     program accordingly, and justify each use of [->>]. *)
 
-(* FILL IN HERE
+(**
+         {{ X = m /\ Z = n }} ->>
+         {{ Z + X = m + n }}
+      while ~(X = 0) do
+           {{ Z + X = m + n /\ X <> 0 }} ->>
+           {{ (Z + 1) + (X - 1) = m + n }}
+         Z := Z + 1;
+           {{ Z + (X - 1) = m + n }}
+         X := X - 1
+           {{ Z + X = m + n }}
+      end
+         {{ Z + X = m + n /\ X = 0 }} ->>
+         {{ Z = m + n }}
+ *)
 
-    [] *)
+(* [] *)
 
 (* ================================================================= *)
 (** ** Example: Parity *)
@@ -798,7 +827,26 @@ Theorem parity_correct : forall (m:nat),
   end
   {{  X = parity m }}.
 Proof.
-  (* FILL IN HERE *) Admitted.
+  intros m.
+  eapply hoare_consequence_pre with (P' := (ap parity X = parity m)%assertion).
+  - eapply hoare_consequence_post.
+    + apply hoare_while.
+      eapply hoare_consequence_pre.
+      * apply hoare_asgn.
+      * verify_assn.
+        rewrite <- H.
+        apply parity_ge_2.
+        apply leb_iff.
+        apply H0.
+    + verify_assn.
+      rewrite <- H.
+      symmetry.
+      apply parity_lt_2.
+      intros Hc.
+      destruct (st X); try destruct n; try lia; discriminate.
+  - verify_assn.
+Qed.
+
 (** [] *)
 
 (* ================================================================= *)
@@ -965,19 +1013,23 @@ Proof.
     Excluding both operations from your loop invariant is advisable.
 
     {{ X = m }} ->>
-    {{                                      }}
+    {{ 1 * X! = m!                          }}
   Y := 1;
-    {{                                      }}
+    {{ Y * X! = m!                          }}
   while ~(X = 0)
-  do   {{                                      }} ->>
-       {{                                      }}
+  do   {{ Y * X! = m! /\ X <> 0                }} ->>
+       {{ Y * X * (X - 1)! = m!                }}
      Y := Y * X;
-       {{                                      }}
+       {{ Y * (X - 1)! = m!                    }}
      X := X - 1
-       {{                                      }}
+       {{ Y * X! = m!                          }}
   end
-    {{                                      }} ->>
+    {{ Y * X! = m! /\ X = 0                      }} ->>
     {{ Y = m! }}
+
+  (1) apply f_equal.
+  (2) rewrite mult_assoc, X <> 0 -> X * (X - 1)! = X!
+  (3) 0! = 1, Y * 1 = Y
 
     Briefly justify each use of [->>].
 *)
@@ -1007,24 +1059,24 @@ Definition manual_grade_for_decorations_in_factorial : option (nat*string) := No
 (**
 
   {{ True }} ->>
-  {{                    }}
+  {{ 0 + min a b = min a b }}
   X := a;
-  {{                       }}
+  {{ 0 + min X b = min a b }}
   Y := b;
-  {{                       }}
+  {{ 0 + min X Y = min a b }}
   Z := 0;
-  {{                       }}
+  {{ Z + min X Y = min a b }}
   while ~(X = 0) && ~(Y = 0) do
-    {{                                     }} ->>
-    {{                                }}
+    {{ Z = min a b + min X Y /\ X <> 0 /\ Y <> 0 }} ->>
+    {{ Z + 1 + min (X - 1) (Y - 1) = min a b }}
     X := X - 1;
-    {{                            }}
+    {{ Z + 1 + min X (Y - 1) = min a b  }}
     Y := Y - 1;
-    {{                        }}
+    {{ Z + 1 + min X Y = min a b }}
     Z := Z + 1
-    {{                       }}
+    {{ Z + min X Y = min a b }}
   end
-  {{                            }} ->>
+  {{ Z + min X Y = min a b /\ X = 0 /\ Y = 0 }} ->>
   {{ Z = min a b }}
 *)
 
@@ -1052,32 +1104,32 @@ Definition manual_grade_for_decorations_in_Min_Hoare : option (nat*string) := No
     following decorated program.
 
       {{ True }} ->>
-      {{                                        }}
+      {{ c = 0 + 0 + c                          }}
     X := 0;
-      {{                                        }}
+      {{ c = X + 0 + c                          }}
     Y := 0;
-      {{                                        }}
+      {{ c = X + Y + c                          }}
     Z := c;
-      {{                                        }}
+      {{ Z = X + Y + c                          }}
     while ~(X = a) do
-        {{                                        }} ->>
-        {{                                        }}
+        {{ Z = X + Y + c /\ X <> a                }} ->>
+        {{ Z + 1 = X + 1 + Y + c                  }}
       X := X + 1;
-        {{                                        }}
+        {{ Z + 1 = X + Y + c                      }}
       Z := Z + 1
-        {{                                        }}
+        {{ Z = X + Y + c                          }}
     end;
-      {{                                        }} ->>
-      {{                                        }}
+      {{ Z = X + Y + c /\ X = a                 }} ->>
+      {{ Z = a + Y + c                          }}
     while ~(Y = b) do
-        {{                                        }} ->>
-        {{                                        }}
+        {{ Z = a + Y + c /\ Y <> b                }} ->>
+        {{ Z + 1 = a + (Y + 1) + c                }}
       Y := Y + 1;
-        {{                                        }}
+        {{ Z + 1 = a + Y + c                      }}
       Z := Z + 1
-        {{                                        }}
+        {{ Z = a + Y + c                          }}
     end
-      {{                                        }} ->>
+      {{ Z = a + Y + c /\ Y = b                 }} ->>
       {{ Z = a + b + c }}
 *)
 
@@ -1104,9 +1156,40 @@ Definition manual_grade_for_decorations_in_two_loops : option (nat*string) := No
 
     Write a decorated program for this, and justify each use of [->>]. *)
 
-(* FILL IN HERE
+(**
+     {{ True }} ->>
+     {{ 1 = 2^(0+1) - 1 /\ 1 = 2^0 }}
+    X := 0;
+     {{ 1 = 2^(X+1) - 1 /\ 1 = 2^X }}
+    Y := 1;
+     {{ Y = 2^(X+1) - 1 /\ 1 = 2^X }}
+    Z := 1;
+     {{ Y = 2^(X+1) - 1 /\ Z = 2^X }}
+    while ~(X = m) do
+       {{ Y = 2^(X+1) - 1 /\ Z = 2^X /\ X <> m }} ->>
+       {{ Y + 2 * Z = 2^(X+1+1) - 1 /\ 2*Z = 2^(X+1) }}
+      Z := 2 * Z;
+       {{ Y + Z = 2^(X+1+1) - 1 /\ Z = 2^(X+1) }}
+      Y := Y + Z;
+       {{ Y = 2^(X+1+1) - 1 /\ Z = 2^(X+1) }}
+      X := X + 1
+       {{ Y = 2^(X+1) - 1 /\ Z = 2^X }}
+    end
+     {{ Y = 2^(X+1) - 1 /\ Z = 2^X /\ X = m }} ->>
+     {{ Y = 2^(m+1) - 1 }}
 
-    [] *)
+   (1) 2^(0+1) - 1 = 2^1 - 1 = 2 - 1 = 1, 1 = 2^0
+   (2) (Y = 2^(X+1) - 1 /\ Z = 2^X) 
+   -> Y + 2*Z = 2^(X+1) - 1 + 2*2^X
+   -> Y + 2*Z = 2^(X+1) + 2^(X+1) - 1
+   -> Y + 2*Z = 2*2^(X+1) - 1
+   -> Y + 2*Z = 2^(X+1+1) - 1,
+     Z = 2^X -> 2*Z = 2*2^X = 2^(X+1)
+   (3) auto.
+
+ *)
+
+(* [] *)
 
 (* ################################################################# *)
 (** * Weakest Preconditions (Optional) *)
@@ -1166,27 +1249,25 @@ Definition is_wp P c Q :=
     What are weakest preconditions of the following commands
     for the following postconditions?
 
-  1) {{ ? }}  skip  {{ X = 5 }}
+  1) {{ X = 5 }}  skip  {{ X = 5 }}
 
-  2) {{ ? }}  X := Y + Z {{ X = 5 }}
+  2) {{ Y + Z = 5 }}  X := Y + Z {{ X = 5 }}
 
-  3) {{ ? }}  X := Y  {{ X = Y }}
+  3) {{ True }}  X := Y  {{ X = Y }}
 
-  4) {{ ? }}
+  4) {{ (X = 0 /\ Z = 4) /\ (X <> 0 \/ W = 3) }}
      if X = 0 then Y := Z + 1 else Y := W + 2 end
      {{ Y = 5 }}
 
-  5) {{ ? }}
+  5) {{ False }}
      X := 5
      {{ X = 0 }}
 
-  6) {{ ? }}
+  6) {{ False }}
      while true do X := 0 end
      {{ X = 0 }}
 *)
-(* FILL IN HERE
-
-    [] *)
+(* [] *)
 
 (** **** Exercise: 3 stars, advanced, optional (is_wp_formal)
 
@@ -1197,7 +1278,18 @@ Definition is_wp P c Q :=
 Theorem is_wp_example :
   is_wp (Y <= 4) <{X := Y + 1}> (X <= 5).
 Proof.
-  (* FILL IN HERE *) Admitted.
+  split.
+  - eapply hoare_consequence_pre.
+    + apply hoare_asgn.
+    + verify_assn.
+  - verify_assn.
+    assert (A: st =[ X := Y + 1 ]=> (X !-> aeval st Y + 1; st)). { apply E_Asgn. auto. }
+    apply H in A.
+    apply A in H0.
+    rewrite t_update_eq in H0.
+    simpl in H0.
+    lia.
+Qed.
 (** [] *)
 
 (** **** Exercise: 2 stars, advanced, optional (hoare_asgn_weakest)
@@ -1208,7 +1300,14 @@ Proof.
 Theorem hoare_asgn_weakest : forall Q X a,
   is_wp (Q [X |-> a]) <{ X := a }> Q.
 Proof.
-(* FILL IN HERE *) Admitted.
+  split.
+  - apply hoare_asgn.
+  - verify_assn.
+    assert (A: st =[ X := a ]=> (X !-> aeval st a; st)). { apply E_Asgn. auto. }
+    apply H in A.
+    apply A in H0.
+    apply H0.
+Qed.
 (** [] *)
 
 (** **** Exercise: 2 stars, advanced, optional (hoare_havoc_weakest)
@@ -1222,7 +1321,13 @@ Lemma hoare_havoc_weakest : forall (P Q : Assertion) (X : string),
   {{ P }} havoc X {{ Q }} ->
   P ->> havoc_pre X Q.
 Proof.
-(* FILL IN HERE *) Admitted.
+  intros P Q X H st HP n.
+  assert (A: st =[ havoc X ]=> (X !-> n; st)). { apply E_Havoc. }
+  apply H in A.
+  apply A in HP.
+  apply HP.
+Qed.
+
 End Himp2.
 (** [] *)
 
@@ -2032,15 +2137,30 @@ becomes
     {{ X = m /\ Y = 0 }} ;
 *)
 
-Example slow_assignment_dec (m : nat) : decorated
-  (* REPLACE THIS LINE WITH ":= _your_definition_ ." *). Admitted.
+Example slow_assignment_dec (m : nat) : decorated :=
+  <{
+        {{ X = m }} ->>
+        {{ 0 + X = m }}
+      Y := 0
+        {{ Y + X = m }};
+      while ~(X = 0) do
+          {{ Y + X = m /\ X <> 0 }} ->>
+          {{ (Y + 1) + (X - 1) = m }}
+        X := X - 1
+          {{ (Y + 1) + X = m }};
+        Y := Y + 1
+          {{ Y + X = m }}
+      end
+        {{ Y + X = m /\ X = 0 }} ->>
+        {{ Y = m }}
+  }>.
 
 (** Now prove the correctness of your decorated program.  If all goes well,
     you will need only [verify]. *)
 
 Theorem slow_assignment_dec_correct : forall m,
   dec_correct (slow_assignment_dec m).
-Proof. (* FILL IN HERE *) Admitted.
+Proof. verify. Qed.
 
 (* Do not modify the following line: *)
 Definition manual_grade_for_check_defn_of_slow_assignment_dec : option (nat*string) := None.
@@ -2077,7 +2197,36 @@ Compute fact 5. (* ==> 120 *)
     For example, recall that [1 + ...] is easier to work with than
     [... + 1]. *)
 
-(* FILL IN HERE *)
+Definition factorial_dec (m : nat) : decorated := 
+  <{
+    {{ X = m }} ->>
+    {{ ap fact X * 1 = fact m }}
+  Y := 1
+    {{ ap fact X * Y = fact m }};
+  while ~(X = 0) do
+       {{ ap fact X * Y = fact m /\ X <> 0 }} ->>
+       {{ X * ap fact (X - 1) * Y = fact m }}
+     Y := Y * X
+       {{ ap fact (X - 1) * Y = fact m }};
+     X := X - 1
+       {{ ap fact X * Y = fact m }}
+  end
+    {{ ap fact X * Y = fact m /\ X = 0 }} ->>
+    {{ Y = ap fact m }}
+    }>.
+
+Theorem factorial_dec_correct : forall m,
+  dec_correct (factorial_dec m).
+Proof.
+  verify.
+  - destruct (st X); try congruence.
+    simpl in *.
+    rewrite sub_0_r.
+    apply H.
+  - simpl in *.
+    rewrite add_0_r in H.
+    apply H.
+Qed.
 
 (* Do not modify the following line: *)
 Definition manual_grade_for_factorial_dec : option (nat*string) := None.
@@ -2113,7 +2262,9 @@ Lemma fib_eqn : forall n,
   n > 0 ->
   fib n + fib (pred n) = fib (1 + n).
 Proof.
-  (* FILL IN HERE *) Admitted.
+  intros.
+  destruct n as [| [| n'] ]; auto; lia.
+Qed.
 (** [] *)
 
 (** **** Exercise: 4 stars, advanced, optional (fib)
@@ -2142,12 +2293,52 @@ Proof.
 
 Definition T : string := "T".
 
-Definition dfib (n : nat) : decorated
-(* REPLACE THIS LINE WITH ":= _your_definition_ ." *). Admitted.
+Definition dfib (n : nat) : decorated :=
+  <{
+      {{ True }} ->>
+      {{ 1 + 1 = fib (1 + 1) 
+        /\ 1 = fib 1 }}
+    X := 1
+      {{ 1 + 1 = ap fib (1 + X) 
+        /\ 1 = ap fib X }};
+    Y := 1
+      {{ 1 + Y = ap fib (1 + X) 
+        /\ 1 = ap fib X }};
+    Z := 1
+      {{ Z + Y = ap fib (1 + X) 
+        /\ Z = ap fib X }};
+    while ~(X = 1 + n) do
+        {{ Z + Y = ap fib (1 + X) 
+          /\ Z = ap fib X 
+          /\ X <> 1 + n }} ->>
+        {{ Z + Y + Z = ap fib (1 + (1 + X)) 
+          /\ Z + Y = ap fib (1 + X) }}
+      T := Z
+        {{ Z + Y + T = ap fib (1 + (1 + X)) 
+          /\ Z + Y = ap fib (1 + X) }};
+      Z := Z + Y
+        {{ Z + T = ap fib (1 + (1 + X))
+          /\ Z = ap fib (1 + X) }};
+      Y := T
+        {{ Z + Y = ap fib (1 + (1 + X))
+          /\ Z = ap fib (1 + X) }} ->>
+        {{ Z + Y = ap fib (1 + (1 + X))
+          /\ Z = ap fib (1 + X) }};
+      X := 1 + X
+        {{ Z + Y = ap fib (1 + X) 
+          /\ Z = ap fib X }}
+    end
+      {{ Z + Y = ap fib (1 + X) 
+        /\ Z = ap fib X
+        /\ X = 1 + n }} ->>
+      {{ Y = fib n }}
+  }>.
 
 Theorem dfib_correct : forall n,
   dec_correct (dfib n).
-(* FILL IN HERE *) Admitted.
+Proof.
+  verify.
+Qed.
 (** [] *)
 
 (** **** Exercise: 5 stars, advanced, optional (improve_dcom)
@@ -2161,8 +2352,169 @@ Theorem dfib_correct : forall n,
     rest of the formal development leading up to the [verification_correct]
     theorem. *)
 
-(* FILL IN HERE
 
-    [] *)
+Module DComImproved.
+
+Inductive dcom : Type :=
+| DCSkip 
+  (* skip *)
+| DCSeq (d1 d2 : dcom)
+  (* d1 ; d2 *)
+| DCAsgn (X : string) (a : aexp) 
+  (* X := a *)
+| DCIf (b : bexp) (d1 d2 : dcom) 
+  (* if b then d1 else d2 end *)
+| DCWhile (b : bexp) (d : dcom) (Pinv : Assertion)
+  (* while b do d {{ Pinv }} end *)
+.
+
+Inductive decorated : Type :=
+  | Decorated : Assertion -> dcom -> Assertion -> decorated.
+
+(** To avoid clashing with the existing [Notation] definitions for
+    ordinary [com]mands, we introduce these notations in a custom entry
+    notation called [dcom]. *)
+
+Notation "'skip' " := (DCSkip) (in custom com at level 0) : dcom_scope.
+Notation "l ':=' a "
+      := (DCAsgn l a)
+      (in custom com at level 0, l constr at level 0,
+          a custom com at level 85, no associativity) : dcom_scope.
+Notation "'while' b 'do' d {{ P }} 'end' "
+      := (DCWhile b d P)
+           (in custom com at level 89, b custom com at level 99,
+           P constr) : dcom_scope.
+Notation "'if' b 'then' d 'else' d' 'end'"
+      := (DCIf b d d')
+           (in custom com at level 89, b at level 99, 
+           d at level 99, d' at level 99) : dcom_scope.
+(*
+Notation "'->>' {{ P }} d"
+      := (DCPre P d)
+      (in custom com at level 12, right associativity, P constr) : dcom'_improved_scope.
+Notation "d '->>' {{ P }}"
+      := (DCPost d P)
+      (in custom com at level 10, right associativity, P constr) : dcom'_improved_scope.
+ *)
+Notation " d ; d' "
+      := (DCSeq d d')
+      (in custom com at level 90, right associativity) : dcom_scope.
+Notation "{{{ P }}} d {{{ Q }}}"
+      := (Decorated P d Q)
+      (in custom com at level 89, P constr, Q constr) : dcom_scope.
+
+Fixpoint extract (d : dcom) : com :=
+  match d with
+  | DCSkip           => CSkip
+  | DCSeq d1 d2      => CSeq (extract d1) (extract d2)
+  | DCAsgn X a       => CAsgn X a
+  | DCIf b d1 d2     => CIf b (extract d1) (extract d2)
+  | DCWhile b d _    => CWhile b (extract d)
+  end.
+
+Reserved Notation "P '={' d '}=>' Q"
+     (at level 40, d custom com at level 99, Q constr at next level).
+
+Inductive dcom_verified : Assertion -> dcom -> Assertion -> Prop :=
+  | C_DCSkip : forall P,
+      P ={ skip }=> P
+  | C_DCSeq : forall P Q R d1 d2,
+      P ={ d1 }=> Q ->
+      Q ={ d2 }=> R ->
+      P ={ d1; d2 }=> R 
+  | C_DCAsgn : forall P Q l a,
+      P ->> Q [l |-> a] ->
+      P ={ l := a }=> Q
+  | C_DCIf : forall P Q (b : bexp) d1 d2,
+      (P /\  b) ={ d1                       }=> Q ->
+      (P /\ ~b) ={ d2                       }=> Q ->
+       P        ={ if b then d1 else d2 end }=> Q 
+  | C_DCWhile : forall P Pinv Q (b : bexp) d,
+       P                           ->> Pinv ->
+      (Pinv /\  b)            ={ d }=> Pinv ->
+      (Pinv /\ ~b)%assertion       ->> Q ->
+       P                      ={ while b do d {{ Pinv }} end }=> Q
+  | C_consequence_pre : forall P Q P' d,
+      P ->> P'      ->
+      P' ={ d }=> Q ->
+      P  ={ d }=> Q
+  | C_consequence_post : forall P Q Q' d,
+      P ={ d }=> Q' ->
+      Q' ->> Q      ->
+      P ={ d }=> Q
+  where "P ={ d }=> Q" := (dcom_verified P d Q).
+
+
+Definition extract_dec (dec : decorated) : com :=
+  match dec with
+  | Decorated P d Q => extract d
+  end.
+
+Definition pre_dec (dec : decorated) : Assertion :=
+  match dec with
+  | Decorated P d Q => P
+  end.
+
+Definition post_dec (dec : decorated) : Assertion :=
+  match dec with
+  | Decorated P d Q => Q
+  end.
+
+Theorem dcom_verified_correct : forall d P Q,
+  P ={ d }=> Q -> {{P}} extract d {{Q}}.
+Proof.
+  intros.
+  induction H; simpl.
+    + intros st st' Heval HP.
+      inversion Heval; subst.
+      assumption.
+    + eapply hoare_seq. 
+      * apply IHdcom_verified2.
+      * apply IHdcom_verified1.
+    + eapply hoare_consequence_pre.
+      * apply hoare_asgn.
+      * apply H.
+    + eapply hoare_if.
+      * apply IHdcom_verified1.
+      * apply IHdcom_verified2.
+    + eapply hoare_consequence_pre.
+      eapply hoare_consequence_post.
+      * apply hoare_while. apply IHdcom_verified.
+      * apply H1.
+      * apply H.
+    + eapply hoare_consequence_pre.
+      apply IHdcom_verified.
+      apply H.
+    + eapply hoare_consequence_post.
+      apply IHdcom_verified.
+      apply H0.
+Qed.
+
+(*
+Definition dfib' (n : nat) : decorated :=
+    {{ True }} 
+    X := 1;
+    Y := 1;
+    Z := 1;
+    while ~(X = 1 + n) do
+      T := Z;
+      Z := Z + Y;
+      Y := T;
+      X := 1 + X
+      (* {{ Z + Y = ap fib (1 + X) /\ Z = ap fib X }} *)
+      {{{  Z + Y = ap fib (1 + X) /\ Z = ap fib X  }}}
+    end
+    {{ Y = fib n }}
+    .
+
+Theorem dfib_correct : forall n,
+  dec_correct (dfib n).
+Proof.
+  verify.
+Qed.
+ *)
+
+End DComImproved.
+(* [] *)
 
 (* 2021-08-11 15:11 *)
