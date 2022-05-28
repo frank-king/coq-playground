@@ -435,7 +435,28 @@ Check <{[x:=true] x}>.
 Inductive substi (s : tm) (x : string) : tm -> tm -> Prop :=
   | s_var1 :
       substi s x (tm_var x) s
-  (* FILL IN HERE *)
+  | s_var2 : forall y,
+      x <> y ->
+      substi s x (tm_var y) (tm_var y)
+  | s_abs1 : forall T t,
+      substi s x (tm_abs x T t) (tm_abs x T t)
+  | s_abs2 : forall y T t1 t2,
+      x <> y ->
+      substi s x t1 t2 ->
+      substi s x (tm_abs y T t1) (tm_abs y T t2)
+  | s_app : forall t1 t1' t2 t2',
+      substi s x t1 t1' ->
+      substi s x t2 t2' ->
+      substi s x (tm_app t1 t2) (tm_app t1' t2')
+  | s_true :
+      substi s x tm_true tm_true
+  | s_false :
+      substi s x tm_false tm_false
+  | s_if : forall t1 t2 t3 t1' t2' t3',
+      substi s x t1 t1' ->
+      substi s x t2 t2' ->
+      substi s x t3 t3' ->
+      substi s x (tm_if t1 t2 t3) (tm_if t1' t2' t3')
 .
 
 Hint Constructors substi : core.
@@ -443,7 +464,20 @@ Hint Constructors substi : core.
 Theorem substi_correct : forall s x t t',
   <{ [x:=s]t }> = t' <-> substi s x t t'.
 Proof.
-  (* FILL IN HERE *) Admitted.
+  split.
+  - generalize dependent t'.
+    induction t; intros; simpl in *; subst; try constructor;
+      try apply IHt1; try apply IHt2; try apply IHt3; try reflexivity;
+      destruct (eqb_stringP x0 s0); subst; constructor; try assumption;
+      apply IHt; reflexivity.
+  - intros H. induction H; simpl;
+      try (rewrite <- eqb_string_refl; reflexivity);
+      try (apply eqb_string_false_iff in H; rewrite H); 
+      try rewrite IHsubsti;
+      try rewrite IHsubsti1; try rewrite IHsubsti2; try rewrite IHsubsti3;
+      reflexivity.
+Qed.
+
 (** [] *)
 
 (* ================================================================= *)
@@ -636,13 +670,15 @@ Lemma step_example5 :
        <{idBBBB idBB idB}>
   -->* idB.
 Proof.
-  (* FILL IN HERE *) Admitted.
+  eapply multi_step. apply ST_App1. auto.
+  eapply multi_step. apply ST_AppAbs. auto.
+  apply multi_refl.
+Qed.
 
 Lemma step_example5_with_normalize :
        <{idBBBB idBB idB}>
   -->* idB.
-Proof.
-  (* FILL IN HERE *) Admitted.
+Proof. normalize. Qed.
 (** [] *)
 
 (* ################################################################# *)
@@ -777,7 +813,14 @@ Example typing_example_2_full :
           (y (y x)) \in
     (Bool -> (Bool -> Bool) -> Bool).
 Proof.
-  (* FILL IN HERE *) Admitted.
+  apply T_Abs.
+  apply T_Abs.
+  apply T_App with (T2 := Ty_Bool).
+  - apply T_Var. reflexivity.
+  - apply T_App with (T2 := Ty_Bool).
+    + apply T_Var. reflexivity.
+    + apply T_Var. reflexivity.
+Qed.
 (** [] *)
 
 (** **** Exercise: 2 stars, standard (typing_example_3)
@@ -799,7 +842,12 @@ Example typing_example_3 :
                (y (x z)) \in
       T.
 Proof.
-  (* FILL IN HERE *) Admitted.
+  eexists.
+  apply T_Abs. apply T_Abs. apply T_Abs.
+  eapply T_App. { apply T_Var. reflexivity. }
+  eapply T_App. { apply T_Var. reflexivity. }
+  apply T_Var. reflexivity.
+Qed.
 (** [] *)
 
 (** We can also show that some terms are _not_ typable.  For example,
@@ -841,7 +889,20 @@ Example typing_nonexample_3 :
         empty |-
           \x:S, x x \in T).
 Proof.
-  (* FILL IN HERE *) Admitted.
+  intros [S [T Hc]].
+  inversion Hc; subst; clear Hc.
+  inversion H4; subst; clear H4.
+  inversion H2; subst; clear H2.
+  inversion H5; subst; clear H5.
+  inversion H1; subst. clear H1.
+  inversion H2; subst; clear H2.
+  generalize dependent T1.
+  induction T2; try discriminate; intros.
+  inversion H0; subst.
+  apply IHT2_1 with (T1 := T2_2).
+  apply H1.
+Qed.
+
 (** [] *)
 
 End STLC.
