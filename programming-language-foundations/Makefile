@@ -9,7 +9,7 @@ ALLVFILES := \
 	Hoare2.v                      Hoare2Test.v \
 	HoareAsLogic.v                HoareAsLogicTest.v \
 	Smallstep.v                   SmallstepTest.v \
-	# Types.v                       TypesTest.v \
+	Types.v                       TypesTest.v \
 	# Stlc.v                        StlcTest.v \
 	# StlcProp.v                    StlcPropTest.v \
 	# MoreStlc.v                    MoreStlcTest.v \

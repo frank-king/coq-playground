@@ -183,7 +183,10 @@ Hint Unfold stuck : core.
 Example some_term_is_stuck :
   exists t, stuck t.
 Proof.
-  (* FILL IN HERE *) Admitted.
+  exists (scc tru). split.
+  - intros Hc. inversion Hc. inversion H. inversion H1.
+  - intros Hc. inversion Hc; inversion H. inversion H1.
+Qed.
 (** [] *)
 
 (** However, although values and normal forms are _not_ the same in
@@ -195,7 +198,12 @@ Proof.
 Lemma value_is_nf : forall t,
   value t -> step_normal_form t.
 Proof.
-  (* FILL IN HERE *) Admitted.
+  intros t [H|H].
+  - destruct H; intros Hc; inversion Hc; inversion H.
+  - induction H; intros Hc; inversion Hc.
+    + inversion H.
+    + inversion H0; subst. apply IHnvalue. exists t1'. apply H2.
+Qed.
 
 (** (Hint: You will reach a point in this proof where you need to
     use an induction to reason about a term that is known to be a
@@ -215,7 +223,24 @@ Proof.
 Theorem step_deterministic:
   deterministic step.
 Proof with eauto.
-  (* FILL IN HERE *) Admitted.
+  assert (Hc: forall x y, nvalue x -> x --> y -> False).
+  {
+    intros. assert (A: value x). { right. apply H. }
+    apply value_is_nf in A. apply A. exists y. apply H0.
+  }
+  intros x y y' Hy.
+  generalize dependent y'.
+  induction Hy; intros y' Hy';
+    inversion Hy'; subst; try reflexivity; try solve_by_invert.
+  - apply IHHy in H3. subst. reflexivity.
+  - apply IHHy in H0. subst. reflexivity.
+  - inversion H1; subst. exfalso. eapply Hc. apply H. apply H2.
+  - inversion Hy; subst. exfalso. eapply Hc. apply H0. apply H1.
+  - apply IHHy in H0. subst. reflexivity.
+  - inversion H1; subst. exfalso. eapply Hc. apply H. apply H2.
+  - inversion Hy; subst. exfalso. eapply Hc. apply H0. apply H1.
+  - apply IHHy in H0. subst. reflexivity.
+Qed.
 (** [] *)
 
 (* ================================================================= *)
@@ -322,7 +347,8 @@ Example scc_hastype_nat__hastype_nat : forall t,
   |- scc t \in Nat ->
   |- t \in Nat.
 Proof.
-  (* FILL IN HERE *) Admitted.
+  intros. inversion H; subst. apply H1.
+Qed.
 (** [] *)
 
 (* ----------------------------------------------------------------- *)
@@ -382,7 +408,24 @@ Proof.
     + (* t1 can take a step *)
       destruct H as [t1' H1].
       exists (test t1' t2 t3). auto.
-  (* FILL IN HERE *) Admitted.
+  - (* T_Scc *)
+    destruct IHHT as [H|[t' H]].
+    + left. apply (nat_canonical t1 HT) in H. right. apply nv_scc. apply H.
+    + right. exists (scc t'). apply ST_Scc. apply H.
+  - (* T_Prd *)
+    right. destruct IHHT as [H|[t' H]].
+    + apply (nat_canonical t1 HT) in H. inversion H; subst.
+      * exists zro. apply ST_PrdZro.
+      * exists t. apply ST_PrdScc. apply H0.
+    + exists (prd t'). apply ST_Prd. apply H.
+  - (* T_Iszro *)
+    right. destruct IHHT as [H|[t' H]].
+    + apply (nat_canonical t1 HT) in H.
+      destruct H.
+      * exists tru. apply ST_IszroZro.
+      * exists fls. apply ST_IszroScc. apply H.
+    + exists (iszro t'). apply ST_Iszro. apply H.
+Qed.
 (** [] *)
 
 (** **** Exercise: 3 stars, advanced (finish_progress_informal)
@@ -410,8 +453,39 @@ Proof.
       - If [t1] itself can take a step, then, by [ST_Test], so can
         [t].
 
-    - (* FILL IN HERE *)
- *)
+    - If the last rule in the derivation is [T_Scc], then [t = scc t1],
+      with [|- t1 \in Nat]. By the IH, either [t1] is a value or else [t1]
+      can step to some [t1'].
+
+      - If [t1] is a value, then by the canonical forms lemmas
+        and the fact that [|- t1 \in Nat] we have that [t1] is a [nvalue].
+        By [nv_scc], [t = scc t1] is also a [nvalue], so it is a [value].
+
+      - If [t1] itself can take a step, then, by [ST_Scc], so can [t].
+    - If the last rule in the derivation is [T_Prd], then [t = prd t1],
+      with [|- t1 \in Nat]. By the IH, either [t1] is a value or else [t1]
+      can step to some [t1'].
+
+      - If [t1] is a value, then by the canonical forms lemmas
+        and the fact that [|- t1 \in Nat] we have that [t1] is a [nvalue] --
+        i.e., it is either [zro] or [scc t1'].
+        If it is [zro], then by [ST_PrdZro], [t] can step to [zro].
+        If it is [scc t1'], then by [ST_PrdScc], [t = prd (scc t)] can 
+        step to [t].
+
+      - If [t1] itself can take a step, then, by [ST_Prd], so can [t].
+    - If the last rule in the derivation is [T_Iszro], then [t = iszro t1],
+      with [|- t1 \in Nat]. By the IH, either [t1] is a value or else [t1]
+      can step to some [t1'].
+
+      - If [t1] is a value, then by the canonical forms lemmas
+        and the fact that [|- t1 \in Nat] we have that [t1] is a [nvalue] --
+        i.e., it is either [zro] or [scc t1'].
+        If it is [zro], then by [ST_IszroZro], [t] can step to [tru].
+        If it is [scc t1'], then by [ST_IszroScc], [t] can step to [fls].
+
+      - If [t1] itself can take a step, then, by [ST_Iszro], so can [t].
+    [] *)
 (* Do not modify the following line: *)
 Definition manual_grade_for_finish_progress_informal : option (nat*string) := None.
 (** [] *)
@@ -451,7 +525,17 @@ Proof.
       + (* ST_TestFls *) assumption.
       + (* ST_Test *) apply T_Test; try assumption.
         apply IHHT1; assumption.
-    (* FILL IN HERE *) Admitted.
+    - (* T_Scc *) inversion HE; subst; clear HE.
+      (* ST_Scc *) apply T_Scc. apply IHHT. assumption.
+    - (* T_Prd *) inversion HE; subst; clear HE.
+      + (* ST_PrdZro *) assumption.
+      + (* ST_PrdScc *) inversion HT; subst. assumption.
+      + (* ST_Prd *) apply T_Prd. apply IHHT. apply H0.
+    - (* T_Iszro *) inversion HE; subst; clear HE.
+      + apply T_Tru.
+      + apply T_Fls.
+      + apply T_Iszro. apply IHHT. assumption.
+Qed.
 (** [] *)
 
 (** **** Exercise: 3 stars, advanced (finish_preservation_informal)
@@ -482,8 +566,48 @@ Proof.
         by the IH, [|- t1' \in Bool].  The [T_Test] rule then gives us
         [|- test t1' then t2 else t3 \in T], as required.
 
-    - (* FILL IN HERE *)
-*)
+    - If the last rule in the derivation is [T_Scc], then [t = scc t1],
+      with [|- t1 \in Nat].
+
+      Inspecting the rules for the small-step reduction relation
+      and remembering that [t] has the form [scc ...], we see that the
+      only ones that could have been used to prove [t --> t'] is [ST_Scc],
+      then [t' = scc t1']. But we know that [|- t1 \in Nat], so we are done.
+
+    - If the last rule in the derivation is [T_Prd], then [t = prd t1],
+      with [|- t1 \in Nat].
+
+      Inspecting the rules for the small-step reduction relation
+      and remembering that [t] has the form [prd ...], we see that the
+      only ones that could have been used to prove [t --> t'] are 
+      [ST_PrdZro], [ST_PrdScc], and [ST_Prd].
+
+      - If the last rule was [ST_PrdZro], then [t' = zro]. It is obvious 
+        by [T_Zro].
+
+      - If the last rule was [ST_PrdScc], then [t' = scc t1']. But we know
+        that [|- t1 \in Nat], so we are done.
+
+      - If the last rule was [ST_Prd], then [t' = prd t1']. But we know
+        that [|- t1 \in Nat], so we are done.
+
+    - If the last rule in the derivation is [T_Iszro], then [t = iszro t1],
+      with [|- t1 \in Nat].
+
+      Inspecting the rules for the small-step reduction relation
+      and remembering that [t] has the form [iszro ...], we see that the
+      only ones that could have been used to prove [t --> t'] are 
+      [ST_IszroZro], [ST_IszroScc], and [ST_Iszro].
+
+      - If the last rule was [ST_IszroZro], then [t' = tru]. It is obvious 
+        by [T_Tru].
+
+      - If the last rule was [ST_IszroScc], then [t' = fls]. It is obvious
+        by [T_Fls].
+
+      - If the last rule was [ST_Iszro], then [t' = iszro t1']. But we know
+        that [|- t1 \in Nat], so we are done.
+    [] *)
 (* Do not modify the following line: *)
 Definition manual_grade_for_finish_preservation_informal : option (nat*string) := None.
 (** [] *)
@@ -502,7 +626,15 @@ Theorem preservation' : forall t t' T,
   t --> t' ->
   |- t' \in T.
 Proof with eauto.
-  (* FILL IN HERE *) Admitted.
+  intros.
+  generalize dependent T.
+  induction H0; intros; try (inversion H; subst; eauto).
+  - inversion H0; subst. eauto.
+  - inversion H0; subst. inversion H3; subst. eauto.
+  - inversion H0; subst. eauto.
+  - inversion H0; subst. eauto.
+Qed.
+
 (** [] *)
 
 (** The preservation theorem is often called _subject reduction_,
@@ -544,8 +676,10 @@ Qed.
     not, give a counter-example.  (You do not need to prove your
     counter-example in Coq, but feel free to do so.)
 
-    (* FILL IN HERE *)
+    (* Given [t = test tru tru zro], [t' = tru]. 
+       we have [t --> t'], [|- t' \in Bool], but [~ |- t \in Bool]. *)
 *)
+
 (* Do not modify the following line: *)
 Definition manual_grade_for_subject_expansion : option (nat*string) := None.
 (** [] *)
@@ -563,11 +697,11 @@ Definition manual_grade_for_subject_expansion : option (nat*string) := None.
    else "becomes false." If a property becomes false, give a
    counterexample.
       - Determinism of [step]
-            (* FILL IN HERE *)
+            remains true
       - Progress
-            (* FILL IN HERE *)
+            becomes false. [t = scc tru].
       - Preservation
-            (* FILL IN HERE *)
+            remains true
 *)
 (* Do not modify the following line: *)
 Definition manual_grade_for_variation1 : option (nat*string) := None.
@@ -582,7 +716,10 @@ Definition manual_grade_for_variation1 : option (nat*string) := None.
 
    Which of the above properties become false in the presence of
    this rule?  For each one that does, give a counter-example.
-            (* FILL IN HERE *)
+
+       - Determinism of [step]
+         [test tru zro (scc zro) --> zro] by ST_TestTru.
+         [test tru zro (scc zro) --> scc zro] by ST_Funny1.
 *)
 (* Do not modify the following line: *)
 Definition manual_grade_for_variation2 : option (nat*string) := None.
@@ -598,7 +735,10 @@ Definition manual_grade_for_variation2 : option (nat*string) := None.
 
    Which of the above properties become false in the presence of
    this rule?  For each one that does, give a counter-example.
-            (* FILL IN HERE *)
+
+       - Determinism of [step]
+         [test (iszro zro) (iszro zro) fls --> test tru (iszro zro) zro] by ST_Test.
+         [test (iszro zro) (iszro zro) fls --> test (iszro zro) tru zro] by ST_Funny2.
 *)
 (** [] *)
 
@@ -611,7 +751,8 @@ Definition manual_grade_for_variation2 : option (nat*string) := None.
 
    Which of the above properties become false in the presence of
    this rule?  For each one that does, give a counter-example.
-(* FILL IN HERE *)
+
+      all remains true.
 *)
 (** [] *)
 
@@ -624,7 +765,8 @@ Definition manual_grade_for_variation2 : option (nat*string) := None.
 
    Which of the above properties become false in the presence of
    this rule?  For each one that does, give a counter-example.
-(* FILL IN HERE *)
+      
+      all remains true.
 *)
 (** [] *)
 
@@ -637,7 +779,11 @@ Definition manual_grade_for_variation2 : option (nat*string) := None.
 
    Which of the above properties become false in the presence of
    this rule?  For each one that does, give a counter-example.
-(* FILL IN HERE *)
+      
+      - Preservation
+        [|- prd zro \in Bool] ->
+        [prd zro --> zro] ->
+        ~[|- zro \in Bool].
 *)
 (** [] *)
 
@@ -648,7 +794,15 @@ Definition manual_grade_for_variation2 : option (nat*string) := None.
     properties -- i.e., ways of changing the definitions that
     break just one of the properties and leave the others alone.
 *)
-(* FILL IN HERE
+(*    - Deterministics of [step]. Contradict with existing [step] rules.
+        | ST_Funny6 :
+           iszro zro --> tru
+      - Progress. Let a non-value and non-steppable term be a certain type.
+        | T_Funny7 :
+           |- prd fls \in Bool
+      - Preservation. Let a steppable term to be a different type from existing definition.
+        | T_Funny8 :
+           |- prd zro \in Bool
 
     [] *)
 
@@ -660,7 +814,8 @@ Definition manual_grade_for_variation2 : option (nat*string) := None.
     achieve this simply by removing the rule from the definition of
     [step]?  Would doing so create any problems elsewhere?
 
-(* FILL IN HERE *)
+    We can. It causes that this term [scc (scc (prd zro))] cannot be stepped,
+    so the [progress] law is broken.  
 *)
 (* Do not modify the following line: *)
 Definition manual_grade_for_remove_predzro : option (nat*string) := None.
@@ -676,7 +831,35 @@ Definition manual_grade_for_remove_predzro : option (nat*string) := None.
     allow for nonterminating programs?  Why might we prefer the
     small-step semantics for stating preservation and progress?
 
-(* FILL IN HERE *)
+     Theorem progress : forall t T,
+       |- t \in T ->
+       value t \/ exists t', t -->* t'.
+
+     Theorem preservation : forall t t' T,
+       |- t \in T ->
+       t -->* t' ->
+       |- t' \in T.
+
+     The progress law is true for all the relations by the [multi_refl] relation.
+
+     The preservation law allows some intermediate state that:
+       exists t1, t2 t3.
+       |- t1 \in T ->
+       ~|- t2 \in T ->
+       |- t3 \in T ->
+       t1 --> t2 ->
+       t2 --> t3 ->
+       preservation t1 t3 T.
+
+     However the original preservation law doesn't allow this to happen.
+
+     The progress law does allow nonterminating programs, but the preservation law
+     doesn't.
+
+     We prefer small-step semantics because it restricts the relations' behavior
+     more accurately. We can prove from progress and perservation property that
+     holds for small steps to that for big steps, but not vice versa.
+
 *)
 (* Do not modify the following line: *)
 Definition manual_grade_for_prog_pres_bigstep : option (nat*string) := None.
