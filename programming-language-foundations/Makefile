@@ -11,7 +11,7 @@ ALLVFILES := \
 	Smallstep.v                   SmallstepTest.v \
 	Types.v                       TypesTest.v \
 	Stlc.v                        StlcTest.v \
-	# StlcProp.v                    StlcPropTest.v \
+	StlcProp.v                    StlcPropTest.v \
 	# MoreStlc.v                    MoreStlcTest.v \
 	# Sub.v                         SubTest.v \
 	# Typechecking.v                TypecheckingTest.v \
