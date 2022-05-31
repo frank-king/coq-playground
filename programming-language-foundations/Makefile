@@ -12,7 +12,7 @@ ALLVFILES := \
 	Types.v                       TypesTest.v \
 	Stlc.v                        StlcTest.v \
 	StlcProp.v                    StlcPropTest.v \
-	# MoreStlc.v                    MoreStlcTest.v \
+	MoreStlc.v                    MoreStlcTest.v \
 	# Sub.v                         SubTest.v \
 	# Typechecking.v                TypecheckingTest.v \
 	# Records.v                     RecordsTest.v \
