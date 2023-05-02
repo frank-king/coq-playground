@@ -345,9 +345,32 @@ Fixpoint type_check (Gamma : context) (t : tm) : option ty :=
   (* Complete the following cases. *)
   
   (* sums *)
-  (* FILL IN HERE *)
+  | <{ inl T1 t }> =>
+      T0 <- type_check Gamma t ;;
+      return <{{T0 + T1}}>
+  | <{ inr T0 t }> =>
+      T1 <- type_check Gamma t ;;
+      return <{{T0 + T1}}>
+  | <{ case t0 of | inl x1 => t1 | inr x2 => t2 }> => 
+      match type_check Gamma t0 with
+      | Some <{{T1 + T2}}> =>
+        match type_check (x1 |-> T1 ; Gamma) t1,
+              type_check (x2 |-> T2 ; Gamma) t2 with
+        | Some T1', Some T2' => if eqb_ty T1' T2' then return T1' else fail
+        | _, _ => fail
+        end
+      | _ => fail
+      end
+
   (* lists (the [tlcase] is given for free) *)
-  (* FILL IN HERE *)
+  | <{nil T}> => return <{{List T}}>
+  | <{h :: t}> => 
+      T1 <- type_check Gamma h ;;
+      match type_check Gamma t with
+      | Some <{{List T2}}> => 
+          if eqb_ty T1 T2 then return <{{List T2}}> else fail
+      | _ => fail
+      end
   | <{ case t0 of | nil => t1 | x21 :: x22 => t2 }> =>
       match type_check Gamma t0 with
       | Some <{{List T}}> =>
@@ -360,14 +383,32 @@ Fixpoint type_check (Gamma : context) (t : tm) : option ty :=
       | _ => None
       end
   (* unit *)
-  (* FILL IN HERE *)
+  | <{ unit }> => return <{{Unit}}>
   (* pairs *)
-  (* FILL IN HERE *)
+  | <{ (t1, t2) }> =>
+      T1 <- type_check Gamma t1 ;;
+      T2 <- type_check Gamma t2 ;;
+      return <{{T1 * T2}}>
+  | <{ t.fst }> =>
+      match type_check Gamma t with
+      | Some <{{T * _}}> => return T
+      | _ => fail
+      end
+  | <{ t.snd }> =>
+      match type_check Gamma t with
+      | Some <{{_ * T}}> => return T
+      | _ => fail
+      end
   (* let *)
-  (* FILL IN HERE *)
+  | <{ let x = t1 in t2 }> =>
+      T1 <- type_check Gamma t1 ;;
+      type_check (x |-> T1 ; Gamma) t2 
   (* fix *)
-  (* FILL IN HERE *)
-  | _ => None  (* ... and delete this line when you complete the exercise. *)
+  | <{ fix t }> => 
+      match type_check Gamma t with
+      | Some <{{T1 -> T2}}> => if eqb_ty T1 T2 then return T1 else fail
+      | _ => fail
+      end
   end.
 
 (** Just for fun, we'll do the soundness proof with just a bit more
@@ -427,7 +468,18 @@ Proof with eauto.
     invert_typecheck Gamma t3 T3.
     destruct T1; try solve_by_invert.
     case_equality T2 T3.
-  (* FILL IN HERE *)
+  - (* inl *) invert_typecheck Gamma t0 T1.
+  - (* inr *) invert_typecheck Gamma t0 T1.
+  - (* tcase *)
+    fully_invert_typecheck Gamma t1 T1 T11 T12.
+    invert_typecheck (s |-> T11; Gamma) t2 T2.
+    invert_typecheck (s0 |-> T12; Gamma) t3 T3.
+    case_equality T2 T3.
+  - (* nil *) eauto.
+  - (* cons *)
+    invert_typecheck Gamma t1 T1.
+    fully_invert_typecheck Gamma t2 T2 T21 T22.
+    case_equality T1 T21.
   - (* tlcase *)
     rename s into x31, s0 into x32.
     fully_invert_typecheck Gamma t1 T1 T11 T12.
@@ -435,7 +487,16 @@ Proof with eauto.
     remember (x31 |-> T11 ; x32 |-> <{{List T11}}> ; Gamma) as Gamma'2.
     invert_typecheck Gamma'2 t3 T3.
     case_equality T2 T3.
-  (* FILL IN HERE *)
+  - (* unit *) eauto.
+  - (* pair *)
+    invert_typecheck Gamma t1 T1.
+    invert_typecheck Gamma t2 T2.
+  - (* fst *) fully_invert_typecheck Gamma t T T1 T2.
+  - (* snd *) fully_invert_typecheck Gamma t T T1 T2.
+  - (* let *) invert_typecheck Gamma t1 T1.
+  - (* fix *) 
+    fully_invert_typecheck Gamma t T1 T11 T12.
+    case_equality T11 T12.
 Qed.
 
 Theorem type_checking_complete : forall Gamma t T,
@@ -454,7 +515,7 @@ Proof.
     try (rewrite (eqb_ty_refl T3));
     eauto.
     - destruct (Gamma x0); [assumption| solve_by_invert].
-      Admitted. (* ... and delete this line *)
+Qed.
 (* 
 Qed. (* ... and uncomment this one *)
 *)
@@ -473,19 +534,277 @@ Module StepFunction.
 Import MoreStlc.
 Import STLCExtended.
 
+Fixpoint is_value (t : tm) : bool := 
+  match t with
+  | tm_var _ => false
+  | <{  \ _ : _, _ }> => true
+  | <{ _ _ }> => false
+  | tm_const n => true
+  | <{ succ _ }> => false
+  | <{ pred _ }> => false
+  | <{ _ * _ }> => false
+  | <{ if0 _ then _ else _ }> => false
+  | <{ inl _ v }> => is_value v
+  | <{ inr _ v }> => is_value v
+  | <{ case _ of | inl _ => _ | inr _ => _ }> => false
+  | <{ nil _ }> => true
+  | <{ v1 :: v2 }> => is_value v1 && is_value v2
+  | <{ case _ of | nil => _ | _ :: _ => _ }> => false
+  | <{ unit }> => true
+  | <{ (v1, v2) }> => is_value v1 && is_value v2
+  | <{ _.fst }> => false
+  | <{ _.snd }> => false
+  | <{ let _ = _ in _ }> => false
+  | <{ fix _ }> => false
+  end.
+
+Theorem value_sound : forall v,
+  is_value v = true -> value v.
+Proof.
+  induction v; intros H; inversion H; try (
+    apply andb_true_iff in H1 as [H1 H2];
+    apply IHv1 in H1; apply IHv2 in H2
+  ); auto.
+Qed.
+
+Theorem value_complete : forall v,
+  value v -> is_value v = true.
+Proof.
+  intros v H.
+  induction H; try apply andb_true_iff;
+    try (split; apply IHvalue1; apply IHvalue2); auto.
+Qed.
+
+Notation "` x <- e1 ;; e2" := (match e1 with
+                                | x => e2
+                                | _ => None
+                                end)
+         (right associativity, x pattern, at level 60).
+
+Notation "'TRY' x <- e1 ;; e2 'OR' e3" := (match e1 with
+                                           | Some x => e2
+                                           | None => e3
+                                           end)
+         (right associativity, x pattern, at level 60).
+
+Notation "'TRY' ` x <- e1 ;; e2 'OR' e3" := (match e1 with
+                                             | x => e2
+                                             | _ => e3
+                                             end)
+         (right associativity, x pattern, at level 60).
+
+
 (* Operational semantics as a Coq function. *)
-Fixpoint stepf (t : tm) : option tm
-  (* REPLACE THIS LINE WITH ":= _your_definition_ ." *). Admitted.
+Fixpoint stepf (t : tm) : option tm :=
+  match t with
+  | tm_var x => fail
+  | <{ \ x : _, t }> => fail
+  | <{ t1 t2 }> => 
+      let step_t2 := t2' <- stepf t2 ;; return <{ t1 t2' }> in
+      TRY t1' <- stepf t1 ;; return <{ t1' t2 }> 
+      OR TRY ` <{ \ x : _, t1' }> <- t1 ;;
+        if is_value t2 then return <{ [x:=t2]t1' }> else step_t2
+      OR if is_value t1 then step_t2 else fail
+  | tm_const n => fail
+  | <{ succ t }> =>
+      TRY t' <- stepf t ;; return <{ succ t' }>
+      OR ` (tm_const n) <- t ;; return tm_const (S n)
+  | <{ pred t }> =>
+      TRY t' <- stepf t ;; return <{ pred t' }>
+      OR ` (tm_const n) <- t ;; return tm_const (n - 1)
+  | <{ t1 * t2 }> =>
+      TRY t1' <- stepf t1 ;; return <{ t1' * t2  }> 
+      OR if is_value t1 then 
+        TRY t2' <- stepf t2 ;; return <{ t1  * t2' }>
+        OR ` (tm_const n1) <- t1 ;;
+           ` (tm_const n2) <- t2 ;;
+           return tm_const (n1 * n2)
+      else fail
+  | <{ if0 guard then t1 else t2 }> =>
+      TRY guard' <- stepf guard ;;
+          return <{ if0 guard' then t1 else t2 }>
+      OR  match guard with
+          | tm_const 0     => return t1
+          | tm_const (S _) => return t2
+          | _ => fail
+          end
+  (* sums *)
+  | <{ inl T1 t }> => t' <- stepf t ;; return <{ inl T1 t' }>
+  | <{ inr T0 t }> => t' <- stepf t ;; return <{ inr T0 t' }>
+  | <{ case t0 of | inl x1 => t1 | inr x2 => t2 }> => 
+      TRY t0' <- stepf t0 ;;
+          return <{ case t0' of | inl x1 => t1 | inr x2 => t2 }>
+      OR  match t0 with
+          | <{ inl _ v }> =>
+              if is_value v then return <{ [x1:=v]t1 }> else fail
+          | <{ inr _ v }> =>
+              if is_value v then return <{ [x2:=v]t2 }> else fail
+          | _ => fail
+          end
+  (* lists *)
+  | <{nil T}> => fail
+  | <{h :: t}> => 
+      TRY h' <- stepf h ;; return <{ h' :: t }>
+      OR  if is_value h 
+          then t' <- stepf t ;; return <{ h :: t' }>
+          else fail
+  | <{ case t0 of | nil => t1 | x21 :: x22 => t2 }> =>
+      TRY t0' <- stepf t0 ;;
+          return <{ case t0' of | nil => t1 | x21 :: x22 => t2 }>
+      OR  match t0 with
+          | <{ nil _ }> => return t1
+          | <{ v1 :: v2 }> => 
+              if is_value t0 
+              then return <{ [x22:=v2][x21:=v1]t2 }>
+              else fail
+          | _ => fail
+          end
+  (* unit *)
+  | <{ unit }> => fail
+  (* pairs *)
+  | <{ (t1, t2) }> =>
+      TRY t1' <- stepf t1 ;; return <{ (t1', t2) }>
+      OR  if is_value t1 
+          then t2' <- stepf t2 ;; return <{ (t1, t2') }>
+          else fail
+  | <{ t.fst }> => 
+      TRY t' <- stepf t ;; return <{ t'.fst }>
+      OR ` <{ (v1, v2) }> <- t ;;
+          if is_value t then return v1 else fail
+  | <{ t.snd }> =>
+      TRY t' <- stepf t ;; return <{ t'.snd }>
+      OR ` <{ (v1, v2) }> <- t ;;
+          if is_value t then return v2 else fail
+  (* let *)
+  | <{ let x = t1 in t2 }> =>
+      TRY t1' <- stepf t1 ;; return <{ let x = t1' in t2  }>
+      OR  if is_value t1 then return <{ [x:=t1]t2 }> else fail
+  (* fix *)
+  | <{ fix t }> => 
+      TRY t' <- stepf t ;; return <{ fix t' }>
+      OR ` <{ \ x : T, t' }> <- t ;; 
+          return <{ ([x := fix (\ x : T, t')] t') }>
+  end.
+
+Lemma step_not_value : forall t t',
+    t --> t' -> value t -> False.
+Proof.
+  intros t t' H.
+  induction H; intros Hf; inversion Hf; subst; congruence.
+Qed.
+
+Lemma value_no_step : forall t,
+  value t -> stepf t = fail.
+Proof.
+  intros t H.
+  induction H; simpl;
+  try rewrite IHvalue; try reflexivity; rewrite IHvalue1;
+    apply value_complete in H; rewrite H; rewrite IHvalue2; auto.
+Qed.
+
+Ltac invert_stepf t := 
+  match goal with
+  | H : match stepf t with | Some t' => _ | None => _ end = Some _
+  , IHt : forall t' : tm, stepf t = Some t' -> t --> t'
+  |- _ => 
+      let Ht := fresh "Ht" in
+      destruct (stepf t) eqn:Ht;
+        [pose (IHt _ (f_equal Some (eq_refl _))); inversion H; auto|
+         try congruence]
+  end.
+
+Ltac invert_is_value t := 
+  match goal with
+  | H : (if is_value t then _ else _) = Some _ |- _ => 
+      let Ht := fresh "Ht" in
+      destruct (is_value t) eqn:Ht;
+        [apply value_sound in Ht; inversion H; auto|try congruence]
+  end.
 
 (* Soundness of [stepf]. *)
 Theorem sound_stepf : forall t t',
     stepf t = Some t'  ->  t --> t'.
-Proof. (* FILL IN HERE *) Admitted.
+Proof.
+  assert (Heq: forall t : tm, return t = return t); [intros; auto|].
+  induction t; intros t' H; try congruence; inversion H;
+    try invert_stepf t0.
+  - (* t1 t2 *)
+    invert_stepf t1.
+    destruct t1; try solve_by_invert;
+      try invert_is_value <{ t1_1 :: t1_2 }>;
+      try invert_is_value <{ (t1_1, t1_2) }>;
+      try invert_is_value t2;
+      simpl in H1;
+      try invert_is_value t1;
+      invert_stepf t2.
+  - (* succ t *)
+    invert_stepf t.
+      destruct t; try congruence.
+      inversion H1. auto.
+  - (* prev t *)
+    invert_stepf t.
+      destruct t; try congruence.
+      inversion H1. auto.
+  - (* t1 * t2 *)
+    invert_stepf t1.
+    invert_is_value t1.
+    invert_stepf t2.
+    destruct t1; try congruence.
+    destruct t2; try congruence.
+    inversion H1. auto.
+  - (* if0 t0 then t1 else t2 *)
+    invert_stepf t1.
+    destruct t1; try congruence.
+    destruct n; inversion H1; auto.
+  - (* case t of | inl x1 => t1 | inr x2 => t2 *)
+    invert_stepf t1.
+    destruct t1; try congruence; invert_is_value t1.
+  - (* t1 :: t2 *)
+    invert_stepf t1. invert_is_value t1. invert_stepf t2.
+  - (* case t of | nil => t1 | x21 :: x22 => t2 *)
+    invert_stepf t1.
+    destruct t1; try congruence; [inversion H1; auto|].
+    invert_is_value <{ t1_1 :: t1_2 }>.
+    inversion Ht0. inversion H1. auto.
+  - (* (t1, t2) *)
+    invert_stepf t1. invert_is_value t1. invert_stepf t2.
+  - (* t.fst *)
+    invert_stepf t.
+    destruct t; try congruence.
+    invert_is_value <{ (t1, t2) }>.
+    inversion Ht0. subst. auto.
+  - (* t.snd *)
+    invert_stepf t.
+    destruct t; try congruence.
+    invert_is_value <{ (t1, t2) }>.
+    inversion Ht0. subst. auto.
+  - (* let x = t1 in t2 *) invert_stepf t1. invert_is_value t1. 
+  - (* fix t *)
+    invert_stepf t.
+    destruct t; try congruence.
+    inversion H1; auto.
+Qed.
 
 (* Completeness of [stepf]. *)
 Theorem complete_stepf : forall t t',
     t --> t'  ->  stepf t = Some t'.
-Proof. (* FILL IN HERE *) Admitted.
+Proof.
+  intros.
+  induction H; simpl; try (
+    try rewrite (value_no_step _ H), (value_complete _ H);
+    try rewrite (value_no_step _ H0), (value_complete _ H0);
+    try rewrite IHstep; reflexivity
+  ).
+  (* ST_App2 *)
+  inversion H; simpl; try (
+    try rewrite (value_no_step _ H1), (value_complete _ H1);
+    try rewrite (value_no_step _ H2), (value_complete _ H2);
+    rewrite IHstep; auto
+  ). 
+  destruct (is_value t2) eqn:Ht2; auto.
+  exfalso. apply value_sound in Ht2.
+  apply (step_not_value t2 t2'); try apply sound_stepf; auto.
+Qed.
 
 End StepFunction.
 (** [] *)
@@ -499,9 +818,675 @@ End StepFunction.
     and interpreter for this language. *)
 
 Module StlcImpl.
+Import MoreStlc.
+Import STLCExtended.
 Import StepFunction.
+Import TypecheckerExtensions.
+From Coq Require Import Strings.String.
+From Coq Require Import Strings.Ascii.
+From Coq Require Import Arith.Arith.
+From Coq Require Import Init.Nat.
+From Coq Require Import Arith.EqNat.
+From Coq Require Import Program.Basics.
+From Coq Require Import Lists.List. Import ListNotations.
 
-(* FILL IN HERE *)
+
+(* ################################################################# *)
+(** * Internals *)
+
+(* ================================================================= *)
+(** ** Lexical Analysis *)
+
+Definition isWhite (c : ascii) : bool :=
+  let n := nat_of_ascii c in
+    (n =? 32) || (* space *)
+    (n =? 9)  || (* tab *)
+    (n =? 10) || (* linefeed *)
+    (n =? 13).   (* Carriage return. *)
+
+Notation "x '<=?' y" := (x <=? y)
+  (at level 70, no associativity) : nat_scope.
+
+Definition isLowerAlpha (c : ascii) : bool :=
+  let n := nat_of_ascii c in
+    (97 <=? n) && (n <=? 122).
+
+Definition isAlpha (c : ascii) : bool :=
+  let n := nat_of_ascii c in
+    (65 <=? n) && (n <=? 90) ||
+    (97 <=? n) && (n <=? 122).
+
+Definition isDigit (c : ascii) : bool :=
+  let n := nat_of_ascii c in
+     (48 <=? n) && (n <=? 57).
+
+Inductive chartype := white | alpha | digit | other.
+
+Definition classifyChar (c : ascii) : chartype :=
+  if      isWhite c then white
+  else if isAlpha c then alpha
+  else if isDigit c then digit
+  else other.
+
+Fixpoint list_of_string (s : string) : list ascii :=
+  match s with
+  | EmptyString => []
+  | String c s => c :: (list_of_string s)
+  end.
+
+Definition string_of_list (xs : list ascii) : string :=
+  fold_right String EmptyString xs.
+
+Definition token := string.
+
+Fixpoint tokenize_helper (cls : chartype) (acc xs : list ascii)
+                       : list (list ascii) :=
+  let tk := match acc with [] => [] | _::_ => [rev acc] end in
+  match xs with
+  | [] => tk
+  | (x::xs') =>
+    match cls, classifyChar x, x with
+    | _, _, "("      =>
+      tk ++ ["("]::(tokenize_helper other [] xs')
+    | _, _, ")"      =>
+      tk ++ [")"]::(tokenize_helper other [] xs')
+    | _, white, _    =>
+      tk ++ (tokenize_helper white [] xs')
+    | alpha,digit,"0"  =>
+        match acc with
+        | ["f"; "i"] => (* deal with [if0] *)
+            ["i"; "f"; "0"] :: (tokenize_helper white [] xs')
+        | _ => tk ++ (tokenize_helper digit [x] xs')
+        end
+    | alpha,alpha,x  =>
+      tokenize_helper alpha (x::acc) xs'
+    | digit,digit,x  =>
+      tokenize_helper digit (x::acc) xs'
+    | other,other,x  =>
+      tokenize_helper other (x::acc) xs'
+    | _,tp,x         =>
+      tk ++ (tokenize_helper tp [x] xs')
+    end
+  end %char.
+
+Definition tokenize (s : string) : list string :=
+  map string_of_list (tokenize_helper white [] (list_of_string s)).
+
+(* ================================================================= *)
+(** ** Parsing *)
+
+(* ----------------------------------------------------------------- *)
+
+(** An [option] type with error messages: *)
+
+Inductive optionE (X:Type) : Type :=
+  | SomeE (x : X)
+  | NoneE (s : string).
+
+Arguments SomeE {X}.
+Arguments NoneE {X}.
+
+(** Some syntactic sugar to make writing nested match-expressions on
+    optionE more convenient. *)
+
+Open Scope string_scope.
+
+Notation "' p <- e1 ;; e2"
+   := (match e1 with
+       | SomeE p => e2
+       | NoneE err => NoneE err
+       end)
+   (right associativity, p pattern, at level 60, e1 at next level).
+
+Notation "'TRY' ' p <- e1 ;; e2 'OR' e3"
+   := (match e1 with
+       | SomeE p => e2
+       | NoneE _ => e3
+       end)
+   (right associativity, p pattern,
+    at level 60, e1 at next level, e2 at next level).
+
+(* ----------------------------------------------------------------- *)
+(** *** Generic Combinators for Building Parsers *)
+
+Definition parser (T : Type) :=
+  list token -> optionE (T * list token).
+
+Fixpoint many_helper {T} (p : parser T) acc steps xs :=
+  match steps, p xs with
+  | 0, _ =>
+      NoneE "Too many recursive calls"
+  | _, NoneE _ =>
+      SomeE ((rev acc), xs)
+  | S steps', SomeE (t, xs') =>
+      many_helper p (t :: acc) steps' xs'
+  end.
+
+(** A (step-indexed) parser that expects zero or more [p]s: *)
+
+Definition many {T} (p : parser T) (steps : nat) : parser (list T) :=
+  many_helper p [] steps.
+
+(** A parser that expects a given token, followed by [p]: *)
+
+Definition firstExpect {T} (t : token) (p : parser T)
+                     : parser T :=
+  fun xs => match xs with
+            | x::xs' =>
+              if string_dec x t
+              then p xs'
+              else NoneE ("expected '" ++ t ++ "'.")
+            | [] =>
+              NoneE ("expected '" ++ t ++ "'.")
+            end.
+
+(** A parser that expects a particular token: *)
+
+Definition expect (t : token) : parser unit :=
+  firstExpect t (fun xs => SomeE (tt, xs)).
+
+(* ----------------------------------------------------------------- *)
+(** *** A Recursive-Descent Parser for Imp *)
+
+(** Identifiers: *)
+
+Definition parseIdentifier (xs : list token)
+                         : optionE (string * list token) :=
+match xs with
+| [] => NoneE "Expected identifier"
+| x::xs' =>
+    if forallb isLowerAlpha (list_of_string x) then
+      SomeE (x, xs')
+    else
+      NoneE ("Illegal identifier:'" ++ x ++ "'")
+end.
+
+(** Numbers: *)
+
+Definition parseNumber (xs : list token)
+                     : optionE (nat * list token) :=
+match xs with
+| [] => NoneE "Expected number"
+| x::xs' =>
+    if forallb isDigit (list_of_string x) then
+      SomeE (fold_left
+               (fun n d =>
+                  10 * n + (nat_of_ascii d -
+                            nat_of_ascii "0"%char))
+               (list_of_string x)
+               0,
+             xs')
+    else
+      NoneE "Expected number"
+end.
+
+Definition left_assoc {A B} f (x : A) (xs : list B) := 
+  fold_left f xs x.
+
+Definition right_assoc {T} f (x : T) (xs : list T) := 
+  match rev xs with
+  | [] => x
+  | x' :: xs' => fold_left (fun A B => f B A) (xs' ++ [x]) x'
+  end.
+(** Parse types *)
+
+Fixpoint parsePrimaryType (steps:nat) (xs : list token) :=
+  match steps with
+  | 0 => NoneE "Too many recursive calls"
+  | S steps' =>
+      match xs with
+      | "Nat" :: rest => SomeE (<{{Nat}}>, rest)
+      | "Unit" :: rest => SomeE (<{{Unit}}>, rest)
+      | "List" :: rest => 
+          ' (T, rest') <- parseSumType steps' rest ;;
+          SomeE (<{{List T}}>, rest')
+      | "(" :: rest0 => 
+          ' (T, rest1) <- parseArrowType steps' rest0 ;;
+          ' (_, rest2) <- expect ")" rest1 ;;
+          SomeE (T, rest2)
+      | _ => NoneE "Expected a type"
+      end
+  end
+
+with parseProductType (steps:nat) (xs : list token) :=
+  match steps with
+  | 0 => NoneE "Too many recursive calls"
+  | S steps' =>
+      ' (T, rest) <- parsePrimaryType steps' xs ;;
+      ' (Ts, rest') <-
+        many (firstExpect "*" (parsePrimaryType steps')) steps' rest  ;;
+      SomeE (left_assoc Ty_Prod T Ts, rest')
+  end
+
+with parseSumType (steps:nat) (xs : list token) :=
+  match steps with
+  | 0 => NoneE "Too many recursive calls"
+  | S steps' =>
+      ' (T, rest) <- parseProductType steps' xs ;;
+      ' (Ts, rest') <-
+        many (firstExpect "+" (parseProductType steps')) steps' rest ;;
+      SomeE (left_assoc Ty_Sum T Ts, rest')
+  end
+
+with parseArrowType (steps:nat) (xs : list token) :=
+  match steps with
+  | 0 => NoneE "Too many recursive calls"
+  | S steps' =>
+      ' (T, rest) <- parseSumType steps' xs ;;
+      ' (Ts, rest') <-
+        many (firstExpect "->" (parseSumType steps')) steps' rest ;;
+      SomeE (right_assoc Ty_Arrow T Ts, rest')
+  end
+.
+
+Definition parseType := parseArrowType.
+
+Definition testParsing {X : Type}
+           (p : nat ->
+                list token ->
+                optionE (X * list token))
+           (s : string) :=
+  let t := tokenize s in p 100 t.
+
+Example type1 :
+  testParsing parseType
+  "Unit -> (Nat -> List Nat) * Unit + Nat -> Unit"
+  = SomeE (<{{Unit -> (Nat -> List Nat) * Unit + Nat -> Unit}}>, []).
+Proof. cbv. reflexivity. Qed.
+
+(** Printing *)
+
+Fixpoint stringifyType T :=
+  match T with
+  | <{{T1 -> T2}}> => stringifyType T1 ++ " -> " ++ stringifyType T2
+  | <{{Nat}}> => "Nat"
+  | <{{T1 + T2}}> => stringifyType T1 ++ " + " ++ stringifyType T2
+  | <{{List T'}}> => "List " ++ stringifyType T'
+  | <{{Unit}}> => "Unit"
+  | <{{Prod}}> => "Prod"
+  end.
+
+Fixpoint string_of_nat_aux (steps n : nat) (acc : string) : string :=
+  let d := match n mod 10 with
+           | 0 => "0" | 1 => "1" | 2 => "2" | 3 => "3" | 4 => "4" 
+           | 5 => "5" | 6 => "6" | 7 => "7" | 8 => "8" | _ => "9"
+           end in
+  let acc' := d ++ acc in
+  match steps with
+    | 0 => acc'
+    | S steps' =>
+      match n / 10 with
+        | 0 => acc'
+        | n' => string_of_nat_aux steps' n' acc'
+      end
+  end.
+
+Definition string_of_nat (n : nat) : string :=
+  string_of_nat_aux n n "".
+
+Fixpoint stringify t :=
+  match t with
+  | tm_var x => x
+  | <{ t1 t2 }> =>
+    "(" ++ stringify t1 ++ " " ++ stringify t2 ++ ")"
+  | <{ \ x : T , t' }>  =>
+      "\ " ++ x ++ " : " ++ stringifyType T ++
+      " , " ++ stringify t'
+  | tm_const n => string_of_nat n
+  | <{ succ t' }> => "succ (" ++ stringify t' ++ ")"
+  | <{ pred t' }> => "pred (" ++ stringify t' ++ ")"
+  | <{ t1 * t2 }> => stringify t1 ++ " * " ++ stringify t2
+  | <{ if0 t0 then t1 else t2 }> =>
+      "if0 " ++ stringify t0
+          ++ " then " ++ stringify t1 ++ " else " ++ stringify t2
+  | <{ inl T t0 }> =>
+      "inl " ++ stringifyType T ++ " (" ++ stringify t0 ++ ")"
+  | <{ inr T t0 }> =>
+      "inr " ++ stringifyType T ++ " (" ++ stringify t0 ++ ")"
+  | <{ case t0 of | inl x1 => t1 | inr x2 => t2 }> =>
+      "case " ++ stringify t0 ++ " of"
+          ++ " | inl " ++ x1 ++ " => " ++ stringify t1
+          ++ " | inr " ++ x2 ++ " => " ++ stringify t2
+  | <{ nil T }> => "nil " ++ stringifyType T
+  | <{ t1 :: t2 }> =>
+      stringify t1 ++ " :: " ++ stringify t2
+  | <{ case t0 of | nil => t1 | x2_1 :: x2_2 => t2 }> =>
+      "case " ++ stringify t0 ++ " of"
+          ++ " | nil => " ++ stringify t1 
+          ++ " | " ++ x2_1 ++ " :: " ++ x2_2 
+          ++ " => " ++ stringify t2
+  | <{ unit }> => "unit"
+  | <{ (t1, t2) }> =>
+      "(" ++ stringify t1 ++ ", " ++ stringify t2 ++ ")"
+  | <{ t0.fst }> => stringify t0 ++ ".fst"
+  | <{ t0.snd }> => stringify t0 ++ ".snd"
+  | <{ let x = t1 in t2 }> =>
+      "let " ++ x ++ " = " ++ stringify t1
+          ++ " in " ++ stringify t2
+  | <{ fix t0 }> => "fix " ++ stringify t0
+  end.
+
+
+(** Parse terms *)
+
+Fixpoint parsePrimaryTerm (steps:nat)
+                          (xs : list token)
+                          : optionE (tm * list token) :=
+  match steps with
+  | 0 => NoneE "Too many recursive calls"
+  | S steps' =>
+      match xs with
+      | "unit" :: rest => SomeE (<{ unit }>, rest)
+      | "let" :: _ => parseLetTerm steps' xs
+      | "case" :: _ => parseCaseTerm steps' xs
+      | "pred" :: rest => 
+          ' (t, rest') <- parseConsTerm steps' rest ;;
+          SomeE (<{ pred t }>, rest')
+      | "succ" :: rest => 
+          ' (t, rest') <- parseConsTerm steps' rest ;;
+          SomeE (<{ pred t }>, rest')
+      | "fix" :: rest => 
+          ' (t, rest') <- parseConsTerm steps' rest ;;
+          SomeE (<{ fix t }>, rest')
+      | "inl" :: rest0 =>
+          ' (T, rest1) <- parseType steps' rest0 ;;
+          ' (t0, rest2) <- parseProductOrAppTerm steps' rest1 ;;
+          SomeE (<{ inl T t0 }>, rest2)
+      | "inr" :: rest0 =>
+          ' (T, rest1) <- parseType steps' rest0 ;;
+          ' (t0, rest2) <- parseProductOrAppTerm steps' rest1 ;;
+          SomeE (<{ inr T t0 }>, rest2)
+      | "\" :: _ => parseAbsTerm steps' xs
+      | "if0" :: _ => parseIf0Term steps' xs
+      | "nil" :: rest =>
+          ' (T, rest') <- parseType steps' rest ;;
+          SomeE (<{ nil T }>, rest')
+      | "(" :: rest => parseMaybePairTerm steps' rest
+      | "in" :: _ | "then" :: _ | "else" :: _  | "of" :: _=>
+          NoneE ("Identifiers should not be one of "
+              ++ "['in'; 'then'; 'else', 'of']")
+      | _ => 
+          TRY ' (id, rest) <- parseIdentifier xs ;;
+              SomeE (tm_var id, rest)
+          OR
+          TRY ' (n, rest) <- parseNumber xs ;;
+              SomeE (tm_const n, rest)
+          OR
+          NoneE "Expected a term"
+      end
+  end
+
+with parseLetTerm (steps:nat) (xs : list token) :=
+  match steps with
+  | 0 => NoneE "Too many recursive calls"
+  | S steps' =>
+    ' (x , rest0) <- firstExpect "let" parseIdentifier xs ;;
+    ' (t1, rest1) <- firstExpect "=" (parseConsTerm steps') rest0 ;;
+    ' (t2, rest2) <- firstExpect "in" (parseConsTerm steps') rest1 ;;
+    SomeE (<{ let x = t1 in t2 }>, rest2)
+  end
+
+with parseCaseTerm (steps:nat) (xs : list token) :=
+  match steps with
+  | 0 => NoneE "Too many recursive calls"
+  | S steps' =>
+    ' (t0, rest0) <- firstExpect "case" (parseConsTerm steps') xs ;;
+    match rest0 with
+    | "of" :: "|" :: "inl" :: rest1 => 
+        ' (x1, rest2) <- parseIdentifier rest1 ;;
+        ' (t1, rest3) <- firstExpect "=>" (parseConsTerm steps') rest2 ;;
+        ' (_ , rest4) <- expect "|" rest3 ;;
+        ' (x2, rest5) <- firstExpect "inr" parseIdentifier rest4 ;;
+        ' (t2, rest6) <- firstExpect "=>" (parseConsTerm steps') rest5 ;;
+        SomeE (<{ case t0 of | inl x1 => t1 | inr x2 => t2 }>, rest6)
+    | "of" :: "|" :: "nil" :: "=>" :: rest1 =>
+        ' (t1, rest2) <- parseConsTerm steps' rest1 ;;
+        ' (x2_1, rest3) <- firstExpect "|"  parseIdentifier rest2 ;;
+        ' (x2_2, rest4) <- firstExpect "::" parseIdentifier rest3 ;;
+        ' (t2, rest5) <- firstExpect "=>" (parseConsTerm steps') rest4 ;;
+        SomeE (<{ case t0 of | nil => t1 | x2_1 :: x2_2 => t2 }>, rest5)
+    | _ => NoneE "Expected 'of | nil =>' or 'of | inl'"
+    end
+  end
+
+with parseAbsTerm (steps:nat) (xs : list token) :=
+  match steps with
+  | 0 => NoneE "Too many recursive calls"
+  | S steps' =>
+    ' (x, rest0) <- firstExpect "\" parseIdentifier xs ;;
+    ' (T, rest1) <- firstExpect ":" (parseType steps') rest0 ;;
+    ' (t, rest2) <- firstExpect "," (parseConsTerm steps') rest1 ;;
+    SomeE (<{ \ x : T , t }>, rest2)
+  end
+
+with parseIf0Term (steps:nat) (xs : list token) :=
+  match steps with
+  | 0 => NoneE "Too many recursive calls"
+  | S steps' =>
+    ' (t0, rest0) <- firstExpect "if0" (parseConsTerm steps') xs ;;
+    ' (t1, rest1) <- firstExpect "then" (parseConsTerm steps') rest0 ;;
+    ' (t2, rest2) <- firstExpect "else" (parseConsTerm steps') rest1 ;;
+    SomeE (<{ if0 t0 then t1 else t2 }>, rest2)
+  end
+
+with parseMaybePairTerm (steps:nat) (xs : list token) :=
+  match steps with
+  | 0 => NoneE "Too many recursive calls"
+  | S steps' =>
+      ' (t, rest) <- parseConsTerm steps' xs ;;
+      match rest with
+      | "," :: rest1 =>
+          ' (t2, rest2) <- parseConsTerm steps' rest1 ;;
+          ' (_, rest3) <- expect ")" rest2 ;;
+          SomeE (<{ (t, t2) }>, rest3)
+      | ")" :: rest' => SomeE (t, rest')
+      | _ => NoneE "Expected ',' or ')' after a term"
+      end
+  end
+
+with parseProjTerm (steps:nat) (xs : list token) :=
+  match steps with
+  | 0 => NoneE "Too many recursive calls"
+  | S steps' =>
+      ' (t, rest) <- parsePrimaryTerm steps' xs ;;
+      ' (projs, rest') <- many (fun xs =>
+          match xs with
+          | "." :: "fst" :: rest => SomeE (false, rest)
+          | "." :: "snd" :: rest => SomeE (true, rest)
+          | _ => NoneE "Expect '.fst' or '.snd'"
+          end) steps' rest ;;
+      SomeE (left_assoc (fun t proj =>
+          match proj with
+          | false => <{ t.fst }>
+          | true => <{ t.snd }>
+          end) t projs, rest')
+  end
+
+with parseProductOrAppTerm (steps:nat) (xs : list token) :=
+  match steps with
+  | 0 => NoneE "Too many recursive calls"
+  | S steps' =>
+      ' (t, rest) <- parseProjTerm steps' xs ;;
+      ' (ts, rest') <- many (fun xs =>
+          match xs with
+          | "*" :: rest => 
+              ' (t, rest') <- parseProjTerm steps' rest ;;
+              SomeE ((t, true), rest')
+          | _ =>
+              ' (t, rest') <- parseProjTerm steps' xs ;;
+              SomeE ((t, false), rest')
+          end
+      ) steps' rest ;;
+      SomeE (left_assoc (fun t1 t2p =>
+          match t2p with
+          | (t2, true) => <{ t1 * t2 }>
+          | (t2, false) => <{ t1 t2 }>
+          end) t ts, rest')
+  end
+
+with parseConsTerm (steps:nat) (xs : list token) :=
+  match steps with
+  | 0 => NoneE "Too many recursive calls"
+  | S steps' =>
+      ' (t, rest) <- parseProductOrAppTerm steps' xs ;;
+      ' (ts, rest') <- many (firstExpect "::" (parseProductOrAppTerm steps')) steps' rest ;;
+      SomeE (right_assoc tm_cons t ts, rest')
+  end.
+
+Definition parseTerm := parseConsTerm.
+
+Example term1 :
+  testParsing parseTerm
+  "let x = \ y : Unit , y in (x unit, 1).snd"
+  = SomeE (<{ let x = \ y : Unit , y in (x unit, 1).snd }>, []).
+Proof. cbv. reflexivity. Qed.
+
+Definition bignumber := 1000.
+
+Definition parseN (steps:nat) (str : string) := 
+  let tokens := tokenize str in
+  match parseTerm steps tokens with
+  | SomeE (t, []) => SomeE t
+  | SomeE (_, t::_) => NoneE ("Trailing tokens remaining: " ++ t)
+  | NoneE err => NoneE err
+  end.
+
+Definition parse := parseN bignumber.
+
+(** Evaluation: *)
+
+Fixpoint evalTerm (steps:nat) t := 
+  match steps with
+  | 0 => NoneE "Too many recursive calls"
+  | S steps' =>
+      match stepf t with
+      | Some t' => 
+          if is_value t' then SomeE t'
+          else evalTerm steps' t'
+      | None => NoneE ("Stuck on term: " ++ stringify t)
+      end
+  end.
+
+Definition evalN (steps:nat) str :=
+  ' t <- parse str ;; 
+  match type_check empty t with
+  | Some _ => evalTerm steps t
+  | None => NoneE "Type error"
+  end.
+
+Definition eval := evalN bignumber.
+
+Fixpoint fact n :=
+  match n with
+  | 0 => 1
+  | S n' => n * fact n'
+  end.
+
+Definition factorial_def :=
+  "(fix \ f : Nat -> Nat, \ n : Nat,
+      if0 n then 1 else n * (f (pred n)))".
+
+Definition factorial_term := <{
+    fix \ "f" : Nat -> Nat, \ "n" : Nat,
+        if0 "n" then 1 else "n" * ("f" (pred "n"))
+    }>.
+
+Eval compute in parse factorial_def.
+Eval compute in type_check empty factorial_term.
+
+Theorem factorial_parse_correct :
+  parse factorial_def = SomeE factorial_term.
+Proof. cbv. reflexivity. Qed.
+
+Theorem factorial_type_check_correct :
+  type_check empty factorial_term = Some <{{Nat -> Nat}}>.
+Proof. cbv. reflexivity. Qed.
+
+Example factorial_7 :
+  eval (factorial_def ++ "7") = SomeE (tm_const (fact 7)).
+Proof. cbv. reflexivity. Qed.
+
+Definition try_prod_def :=
+  "(fix \ f : List (Nat + Unit) -> (Nat + Unit), \ l : List (Nat + Unit),
+      case l of
+      | nil => inl Unit 1
+      | h :: t => case h of
+                  | inl n =>
+                          let x = f t in
+                          case x of 
+                          | inl r => inl Unit (n * r)
+                          | inr x => inr Nat unit
+                  | inr y => inr Nat unit)".
+
+Definition try_prod_term := <{
+  fix \ "f" : List (Nat + Unit) -> (Nat + Unit), \ "l" : List (Nat + Unit),
+      case "l" of
+      | nil => inl Unit 1
+      | "h" :: "t" => case "h" of
+                      | inl "n" => 
+                          let "x" = "f" "t" in
+                          case "x" of 
+                          | inl "r" => inl Unit ("n" * "r")
+                          | inr "x" => inr Nat unit
+                      | inr "y" => inr Nat unit
+    }>.
+
+Theorem try_prod_parse_correct :
+  parse try_prod_def = SomeE try_prod_term.
+Proof. cbv. reflexivity. Qed.
+
+Theorem try_prod_type_check_correct :
+  type_check empty try_prod_term =
+    Some <{{List (Nat + Unit) -> (Nat + Unit)}}>.
+Proof. cbv. reflexivity. Qed.
+
+Example try_prod_nil :
+  eval (try_prod_def ++ "nil (Nat + Unit)") =
+    SomeE <{ inl Unit 1 }>.
+Proof. cbv. reflexivity. Qed.
+
+Example try_prod_singleton :
+  eval (try_prod_def ++ "(inl Unit 1 :: nil (Nat + Unit))") =
+    SomeE <{ inl Unit 1 }>.
+Proof. cbv. reflexivity. Qed.
+
+Example try_prod_some :
+  eval (try_prod_def ++ "(inl Unit 3 :: inl Unit 5 :: nil (Nat + Unit))") =
+    SomeE <{ inl Unit 15 }>.
+Proof. cbv. reflexivity. Qed.
+
+Example try_prod_none :
+  eval (try_prod_def ++
+    "(inl Unit 3 :: inr Nat unit :: inl Unit 5 :: nil (Nat + Unit))") =
+    SomeE <{ inr Nat unit }>.
+Proof. cbv. reflexivity. Qed.
+
+Definition swap_pair_def :=
+  "(\ pair : Nat * Nat,
+      let x = pair.fst in
+      let y = pair.snd in
+      (y, x))".
+
+Definition swap_pair_term := <{
+  \ "pair" : Nat * Nat,
+      let x = "pair".fst in
+      let y = "pair".snd in
+      (y, x)
+  }>.
+
+Theorem swap_pair_parse_correct :
+  parse swap_pair_def = SomeE swap_pair_term.
+Proof. cbv. reflexivity. Qed.
+
+Theorem swap_pair_type_check_correct :
+  type_check empty swap_pair_term = 
+    Some <{{(Nat * Nat) -> (Nat * Nat)}}>.
+Proof. cbv. reflexivity. Qed.
+
+Example swap_pair_test :
+  eval (swap_pair_def ++ "(1, 2)") = SomeE (<{ (2, 1) }>).
+Proof. cbv. reflexivity. Qed.
+
 End StlcImpl.
 (** [] *)
 

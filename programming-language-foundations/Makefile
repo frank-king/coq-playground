@@ -14,7 +14,7 @@ ALLVFILES := \
 	StlcProp.v                    StlcPropTest.v \
 	MoreStlc.v                    MoreStlcTest.v \
 	Sub.v                         SubTest.v \
-	# Typechecking.v                TypecheckingTest.v \
+	Typechecking.v                TypecheckingTest.v \
 	# Records.v                     RecordsTest.v \
 	# References.v                  ReferencesTest.v \
 	# RecordSub.v                   RecordSubTest.v \
